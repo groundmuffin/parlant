@@ -1088,6 +1088,7 @@ class AlphaEngine(Engine):
                     "tc",
                     attributes={
                         "tool_id": tool_call["tool_id"],
+                        "rationale": tool_call["rationale"],
                         "arguments": json.dumps(tool_call["arguments"]),
                         "result": json.dumps(tool_call["result"]),
                     },
@@ -1109,16 +1110,13 @@ class AlphaEngine(Engine):
                         "node_id": extract_node_id_from_journey_node_guideline_id(
                             match.guideline.id
                         ),
+                        "journey_path": json.dumps(
+                            match.guideline.metadata.get("journey_path_guideline_ids", [])
+                        ),
                         "condition": match.guideline.content.condition,
                         "action": match.guideline.content.action or "",
                         "rationale": match.rationale,
-                        "journey_id": cast(
-                            str,
-                            cast(
-                                dict[str, JSONSerializable],
-                                match.guideline.metadata["journey_node"],
-                            )["journey_id"],
-                        ),
+                        "journey_id": cast(str, match.metadata.get("step_selection_journey_id")),
                         **(
                             {
                                 "sub_journey_id": cast(
@@ -1155,7 +1153,7 @@ class AlphaEngine(Engine):
                 edge_id = extract_edge_id_from_journey_node_guideline_id(skip.guideline.id)
 
                 self._tracer.add_event(
-                    "journey.skipped",
+                    "journey.state.skipped",
                     attributes={
                         **({"edge_id": edge_id} if edge_id else {}),
                         "node_id": extract_node_id_from_journey_node_guideline_id(
@@ -1164,13 +1162,10 @@ class AlphaEngine(Engine):
                         "condition": skip.guideline.content.condition,
                         "action": skip.guideline.content.action or "",
                         "rationale": skip.rationale,
-                        "journey_id": cast(
-                            str,
-                            cast(
-                                dict[str, JSONSerializable],
-                                skip.guideline.metadata["journey_node"],
-                            )["journey_id"],
+                        "journey_path": json.dumps(
+                            skip.guideline.metadata.get("journey_path_guideline_ids", [])
                         ),
+                        "journey_id": cast(str, skip.metadata.get("step_selection_journey_id")),
                         **(
                             {
                                 "sub_journey_id": cast(
