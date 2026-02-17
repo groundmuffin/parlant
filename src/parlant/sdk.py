@@ -27,6 +27,7 @@ import importlib.util
 from itertools import chain
 from pathlib import Path
 import sys
+import warnings
 import rich
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -948,6 +949,10 @@ class Guideline:
             )
             for t in targets
         ]
+
+    async def exclude(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
+        """Alias for prioritize_over. Creates priority relationships with other guidelines or journeys."""
+        return await self.prioritize_over(*targets)
 
     async def depend_on(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
         """Creates dependency relationships with other guidelines or journeys."""
@@ -2360,9 +2365,10 @@ class Journey:
         id: GuidelineId | None = None,
         track: bool = True,
         labels: Iterable[str] = (),
+        dependencies: Sequence[Guideline | Journey] = [],
     ) -> Guideline:
         """Creates a guideline with the specified condition and action, as well as (optionally) tools to achieve its task."""
-        return await self._server._create_guideline(
+        guideline = await self._server._create_guideline(
             condition=condition,
             action=action,
             description=description,
@@ -2382,10 +2388,16 @@ class Journey:
             labels=labels,
         )
 
+        if dependencies:
+            await guideline.depend_on(*dependencies)
+
+        return guideline
+
     async def create_observation(
         self,
         condition: str | None = None,
         description: str | None = None,
+        tools: Iterable[ToolEntry] = [],
         canned_responses: Sequence[CannedResponseId] = [],
         composition_mode: CompositionMode | None = None,
         matcher: Callable[[GuidelineMatchingContext, Guideline], Awaitable[GuidelineMatch]]
@@ -2394,18 +2406,21 @@ class Journey:
         canned_response_field_provider: Callable[[EngineContext], Awaitable[Mapping[str, Any]]]
         | None = None,
         labels: Iterable[str] = (),
+        dependencies: Sequence[Guideline | Journey] = [],
     ) -> Guideline:
         """A shorthand for creating an observational guideline with the specified condition."""
 
         return await self.create_guideline(
             condition=condition,
             description=description,
+            tools=tools,
             canned_responses=canned_responses,
             composition_mode=composition_mode,
             matcher=matcher,
             on_match=on_match,
             canned_response_field_provider=canned_response_field_provider,
             labels=labels,
+            dependencies=dependencies,
         )
 
     async def attach_tool(
@@ -2413,7 +2428,16 @@ class Journey:
         tool: ToolEntry,
         condition: str,
     ) -> GuidelineId:
-        """Attaches a tool to the journey, to be usable by the agent under the specified condition."""
+        """Attaches a tool to the journey, to be usable by the agent under the specified condition.
+
+        .. deprecated::
+            Use ``create_guideline`` or ``create_observation`` with the ``tools`` parameter instead.
+        """
+        warnings.warn(
+            "attach_tool() is deprecated. Use create_guideline() or create_observation() with the tools parameter instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         await self._server._plugin_server.enable_tool(tool)
 
@@ -2499,6 +2523,10 @@ class Journey:
             )
             for t in targets
         ]
+
+    async def exclude(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
+        """Alias for prioritize_over. Creates priority relationships with other guidelines or journeys."""
+        return await self.prioritize_over(*targets)
 
     async def depend_on(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
         """Creates dependency relationships with other guidelines or journeys."""
@@ -2844,6 +2872,7 @@ class Agent:
         on_match: Callable[[EngineContext, JourneyMatch], Awaitable[None]] | None = None,
         on_message: Callable[[EngineContext, JourneyMatch], Awaitable[None]] | None = None,
         labels: Iterable[str] = (),
+        dependencies: Sequence[Guideline | Journey] = [],
     ) -> Journey:
         """Creates a new journey with the specified title, description, and conditions."""
 
@@ -2862,7 +2891,7 @@ class Agent:
 
         await self.attach_journey(journey)
 
-        return Journey(
+        result = Journey(
             id=journey.id,
             title=journey.title,
             description=description,
@@ -2876,6 +2905,11 @@ class Agent:
             _server=self._server,
             _container=self._container,
         )
+
+        if dependencies:
+            await result.depend_on(*dependencies)
+
+        return result
 
     async def attach_journey(self, journey: Journey) -> None:
         """Attaches an existing journey to the agent, allowing it to be used in interactions."""
@@ -2904,9 +2938,10 @@ class Agent:
         | None = None,
         track: bool = True,
         labels: Iterable[str] = (),
+        dependencies: Sequence[Guideline | Journey] = [],
     ) -> Guideline:
         """Creates a guideline with the specified condition and action, as well as (optionally) tools to achieve its task."""
-        return await self._server._create_guideline(
+        guideline = await self._server._create_guideline(
             condition=condition,
             action=action,
             description=description,
@@ -2926,10 +2961,16 @@ class Agent:
             labels=labels,
         )
 
+        if dependencies:
+            await guideline.depend_on(*dependencies)
+
+        return guideline
+
     async def create_observation(
         self,
         condition: str | None = None,
         description: str | None = None,
+        tools: Iterable[ToolEntry] = [],
         canned_responses: Sequence[CannedResponseId] = [],
         criticality: Criticality = Criticality.MEDIUM,
         composition_mode: CompositionMode | None = None,
@@ -2939,12 +2980,14 @@ class Agent:
         canned_response_field_provider: Callable[[EngineContext], Awaitable[Mapping[str, Any]]]
         | None = None,
         labels: Iterable[str] = (),
+        dependencies: Sequence[Guideline | Journey] = [],
     ) -> Guideline:
         """A shorthand for creating an observational guideline with the specified condition."""
 
         return await self.create_guideline(
             condition=condition,
             description=description,
+            tools=tools,
             canned_responses=canned_responses,
             composition_mode=composition_mode,
             matcher=matcher,
@@ -2952,6 +2995,7 @@ class Agent:
             criticality=criticality,
             canned_response_field_provider=canned_response_field_provider,
             labels=labels,
+            dependencies=dependencies,
         )
 
     async def attach_tool(
@@ -2959,7 +3003,16 @@ class Agent:
         tool: ToolEntry,
         condition: str,
     ) -> GuidelineId:
-        """Attaches a tool to the agent, to be usable under the specified condition."""
+        """Attaches a tool to the agent, to be usable under the specified condition.
+
+        .. deprecated::
+            Use ``create_guideline`` or ``create_observation`` with the ``tools`` parameter instead.
+        """
+        warnings.warn(
+            "attach_tool() is deprecated. Use create_guideline() or create_observation() with the tools parameter instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         await self._server._plugin_server.enable_tool(tool)
 
@@ -3459,6 +3512,11 @@ class Server:
         self._creation_progress.__exit__(None, None, None)
         self._creation_progress = None
 
+        if exc_value is not None:
+            await self._startup_context_manager.__aexit__(exc_type, exc_value, tb)
+            await self._exit_stack.aclose()
+            return False
+
         with self._container[Tracer].span(
             "startup.evaluations",
             attributes={"scope": "Evaluations"},
@@ -3470,13 +3528,17 @@ class Server:
         # Start health check polling to set ready event when the server is ready to receive requests
         health_check_task = asyncio.create_task(self._poll_health_endpoint())
 
-        # This actually starts the server
-        await self._startup_context_manager.__aexit__(exc_type, exc_value, tb)
+        try:
+            # This actually starts the server
+            await self._startup_context_manager.__aexit__(None, None, None)
+        except BaseException:
+            health_check_task.cancel()
+            raise
+        finally:
+            # Wait for health check to complete before cleanup
+            await health_check_task
+            await self._exit_stack.aclose()
 
-        # Wait for health check to complete before cleanup
-        await health_check_task
-
-        await self._exit_stack.aclose()
         return False
 
     # Start background task to poll health endpoint and set ready event

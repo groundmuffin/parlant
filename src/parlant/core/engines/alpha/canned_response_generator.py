@@ -273,7 +273,8 @@ class ToolBasedFieldExtraction(CannedResponseFieldExtractionMethod):
         )
 
         for tool_call in tool_calls_in_order_of_importance:
-            if value := tool_call["result"].get("canned_response_fields", {}).get(field_name, None):
+            value = tool_call["result"].get("canned_response_fields", {}).get(field_name, None)
+            if value is not None:
                 return True, value
 
         return False, None
@@ -2494,6 +2495,8 @@ The draft message contains what should be said right now.
 The style reference messages teach you what communication style to try to copy.
 
 You must say what the draft message says, but capture the tone, style, and choice of words in the reference messages as precisely as you can.
+
+IMPORTANT: The revised message MUST be in the same language as the draft message. If the draft message is in French, respond in French. If it's in Spanish, respond in Spanish. Only copy the style and tone from the reference messages, not their language.
 
 Make sure NOT to add, remove, or hallucinate information nor add or remove key words (nouns, verbs) to the message.
 
