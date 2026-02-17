@@ -1048,7 +1048,7 @@ def given_the_tool_from_service(
     }
 
     tool = context.sync_await(
-        local_tool_service.create_tool(**service_tools[service_name][tool_name])
+        local_tool_service.create_tool(**service_tools[service_name][tool_name], consequential=True)
     )
 
     context.tools[tool_name] = tool
@@ -1061,7 +1061,9 @@ def given_a_tool(
 ) -> None:
     local_tool_service = context.container[LocalToolService]
 
-    tool = context.sync_await(local_tool_service.create_tool(**TOOLS[tool_name]))
+    tool = context.sync_await(
+        local_tool_service.create_tool(**TOOLS[tool_name], consequential=True)
+    )
 
     context.tools[tool_name] = tool
 
