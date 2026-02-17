@@ -2,7 +2,6 @@ Feature: Capabilities
     Background:
         Given the alpha engine
         And an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
 
 

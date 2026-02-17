@@ -2,7 +2,6 @@ Feature: Tools
     Background:
         Given the alpha engine
         And an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
 
     Scenario: Single tool get_available_drinks is being called once
@@ -130,7 +129,6 @@ Feature: Tools
 
     Scenario: Relevant guidelines are not refreshed based on tool results if no second iteration of matching a new guideline is made
         Given an agent with a maximum of 1 engine iterations
-        And that the agent uses the canned_fluid message composition mode
         And a guideline "retrieve_account_information" to retrieve account information when customers inquire about account-related information
         And the tool "get_account_balance"
         And an association between "retrieve_account_information" and "get_account_balance"
@@ -958,7 +956,6 @@ Feature: Tools
 
     Scenario: The agent correctly chooses to call the right overlapping tool based on glossary
         Given an agent whose job is to sell groceries
-        And that the agent uses the canned_fluid message composition mode
         And the term "carrot" defined as a kind of fruit
         And a guideline "check_prices" to reply with the price of the item when a customer asks about an items price
         And the tool "check_fruit_price"

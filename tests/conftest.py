@@ -25,7 +25,7 @@ import pytest
 
 from parlant.adapters.db.json_file import JSONFileDocumentDatabase
 from parlant.adapters.loggers.websocket import WebSocketLogger
-from parlant.adapters.nlp.emcie_service import EmcieService
+from parlant.adapters.nlp.openai_service import OpenAIService
 from parlant.adapters.vector_db.transient import TransientVectorDatabase
 from parlant.api.app import create_api_app, ASGIApplication
 from parlant.api.authorization import AuthorizationPolicy, DevelopmentAuthorizationPolicy
@@ -388,12 +388,10 @@ async def container(
                 logger=container[Logger],
                 tracer=container[Tracer],
                 nlp_services_provider=lambda: {
-                    "default": EmcieService(
+                    "default": OpenAIService(
                         container[Logger],
                         container[Tracer],
                         container[Meter],
-                        model_tier=os.environ.get("EMCIE_MODEL_TIER", "jackal"),  # type: ignore
-                        model_role=os.environ.get("EMCIE_MODEL_ROLE", "teacher"),  # type: ignore
                     )
                 },
             )

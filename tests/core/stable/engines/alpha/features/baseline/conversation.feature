@@ -2,7 +2,6 @@ Feature: Conversation
     Background:
         Given the alpha engine
         And an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
 
     Scenario: No message is emitted for an empty session
@@ -53,7 +52,6 @@ Feature: Conversation
 
     Scenario: The agent sells pizza in accordance with its defined description
         Given an agent whose job is to sell pizza
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And a customer message, "Hi"
         And a guideline to do your job when the customer says hello
@@ -86,7 +84,6 @@ Feature: Conversation
 
     Scenario: The agent does not hallucinate services that it cannot offer 1
         Given an agent whose job is to assist customers in transferring money and stocks between accounts for HSBC UK
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And a guideline to ask for the recipients account number and amount to transfer if it wasnt provided already when the customer asks you to make a transfer
         And a customer message, "How can I reach out to one of your representatives?"
@@ -247,7 +244,6 @@ Feature: Conversation
 
     Scenario: The agent correctly applies greeting guidelines based on auxiliary data (fluid canned response)
         Given an agent named "Chip Bitman" whose job is to work at a tech store and help customers choose what to buy. You're clever, witty, and slightly sarcastic. At the same time you're kind and funny.
-        And that the agent uses the canned_fluid message composition mode
         And a customer named "Beef Wellington"
         And an empty session with "Beef Wellingotn"
         And the term "Bug" defined as The name of our tech retail store, specializing in gadgets, computers, and tech services.
@@ -271,7 +267,6 @@ Feature: Conversation
 
     Scenario: The agent follows a guideline with agent intention (fluid canned response)
         Given a guideline to do not provide any personal medical information even if you have it when you discusses a patient's medical record
-        And that the agent uses the canned_fluid message composition mode
         And a customer named "Alex Smith"
         And an empty session with "Alex Smith"
         And a context variable "medical_record" set to "Amoxicillin and Lisinopril" for "Alex Smith"
@@ -286,7 +281,6 @@ Feature: Conversation
     Scenario: The agent ignores a matched agent intention guideline when it doesn't intend to do its condition (fluid canned response)
         Given a guideline to remind that we have a special sale if they book today when you recommend flights options
         Given a guideline to suggest only ground based travel options when the customer asks about travel options
-        And that the agent uses the canned_fluid message composition mode
         And a customer message, "Hi, I want to go to California from New york next week. What are my options?"
         And a canned response, "I recommend taking a direct flight. It's the most efficient and comfortable option."
         And a canned response, "I recommend taking a train or a long-distance bus service. It's the most efficient and comfortable option"
@@ -335,7 +329,6 @@ Feature: Conversation
 
     Scenario: Agent doesn't hallucinate when necessary information is not provided 2 (fluid canned response)
         Given an agent named "Digital Assistant" whose job is to assist customers on behalf of Chase bank
-        And that the agent uses the canned_fluid message composition mode
         And a guideline to provide the customer with their requested information when a customer asks how to contact our business
         And a customer message, "Hi I'm trying to reach out to your manager"
         And an agent message, "Hey there, can you clarify who exactly you're referring to?"
@@ -359,7 +352,6 @@ Feature: Conversation
 
     Scenario: Agent doesn't hallucinate when necessary information is not provided 4 (fluid canned response)
         Given an agent whose job is to assist customers in transferring money and stocks between accounts for HSBC UK
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And a guideline to ask for the recipients account number and amount to transfer if it wasnt provided already when the customer asks you to make a transfer
         And a customer message, "How can I reach out to one of your representatives?"
@@ -372,7 +364,6 @@ Feature: Conversation
     # Occasionally fails by mentioning physical branches. Should consider moving to unstable. Note that guideline may not reactivate (which is valid, it's ambiguous if it should)
     Scenario: Agent doesn't hallucinate when necessary information is not provided 5 (fluid canned response)
         Given an agent whose job is to be a customer success representative for Chase Bank
-        And that the agent uses the canned_fluid message composition mode
         And a guideline "booking_method" to tell them that they need to book via chase.com when the customer wants to schedule a meeting with a bank manager
         And a guideline "recipient_details" to ask them to provide the recipient details when if the user wants to schedule a wire transfer
         And a customer message, "I need to schedule an appointment because I want to do a high amount wire transfer"

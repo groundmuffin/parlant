@@ -2,13 +2,11 @@ Feature: Conversation
     Background:
         Given the alpha engine
         And an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
 
     Scenario: The agent says goodbye back when the customer says goodbye
         Given an agent
         And an empty session
-        And that the agent uses the canned_fluid message composition mode
         And a customer message, "how are you?"
         And an agent message, "I'm doing well, thank you! How about you?"
         And a customer message, "pretty good"
@@ -25,7 +23,6 @@ Feature: Conversation
     Scenario: The agent strictly follows guideline rule
         Given an agent whose job is to answer questions regarding Mobileye
         And an empty session
-        And that the agent uses the canned_fluid message composition mode
         And a guideline "answer_politely" to politely answer that you have no information when a user asks any questions aside from Mobileye
         And a guideline "answer_rudely" to rudely answer to go away when a user asks any information aside from Mobileye for the third time
         And a customer message, "Hey how are ya mate?"
@@ -43,7 +40,6 @@ Feature: Conversation
 
     Scenario: The agent stays consistent with suggested results
         Given an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And a guideline "suggest_relevant_tags" to suggest three tags from "storage, portable, external, productivity, office, business, professional, mainstream, creative, studio, development" when a user asks a question about a product
         And a customer message, "Hi I'm looking for an laptop that suits a software developer. Can you suggest me what tags are relevant for it?"
@@ -56,7 +52,6 @@ Feature: Conversation
 
     Scenario: The agent does not wrongly reapply partially fulfilled guideline
         Given an agent named "Chip Bitman" whose job is to work at a tech store and help customers choose what to buy. You're clever, witty, and slightly sarcastic. At the same time you're kind and funny.
-        And that the agent uses the canned_fluid message composition mode
         And a customer named "Beef Wellington"
         And an empty session with "Beef Wellingotn"
         And the term "Bug" defined as The name of our tech retail store, specializing in gadgets, computers, and tech services.
@@ -79,7 +74,6 @@ Feature: Conversation
 
     Scenario: The agent replies politely when its nagged with the same question
         Given an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And a guideline to reply that we are open Monday through Friday, from 9 AM to 5 PM Eastern Time when the customer asks about our openning hours
         And a customer message, "what time do you open"
@@ -92,7 +86,6 @@ Feature: Conversation
 
     Scenario: Message generator correctly filters tool results according to customer request
         Given an empty session
-        And that the agent uses the canned_fluid message composition mode
         And a context variable "customer_id" set to "J2T3F00"
         And a guideline "get_bookings_guideline" to present all relvant bookings to the customer when the customer asks to modify a booking
         And the tool "get_bookings"
@@ -106,7 +99,6 @@ Feature: Conversation
 
     Scenario: The agent uses the freshest data when multiple sources are available
         Given an agent
-        And that the agent uses the canned_fluid message composition mode
         And a guideline "clarify_needs" to help the customer clarify their needs and preferences when customer's interested in a product type but didn't choose yet
         And a guideline "recommend_products" to recommend the best fit out of what we have available when customer said what product they want as well as their needs
         And the tool "get_products_by_type"
@@ -126,7 +118,6 @@ Feature: Conversation
 
     Scenario: The agent re-asks for clarification when disambiguation is needed and the customer hasn't responded
         Given an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And a guideline "snake_roller_coaster" to book it when the customer asks for the snake roller coaster
         And a guideline "turtle_roller_coaster" to book it when the customer asks for the turtle roller coaster
@@ -146,7 +137,6 @@ Feature: Conversation
 
     Scenario: The agent adheres to the clarification guideline when disambiguation is needed
         Given an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And a guideline "snake_roller_coaster" to book it when the customer asks for the snake roller coaster
         And a guideline "turtle_roller_coaster" to book it when the customer asks for the turtle roller coaster
@@ -164,9 +154,7 @@ Feature: Conversation
 
     Scenario: The agent ignores tool results when guideline instructs to do so (fluid canned response)
         Given an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
-        And that the agent uses the canned_fluid message composition mode
         And a guideline to Ask a polite clarifying question without assuming their intent. when The customer's message is unclear or ambiguous
         And a guideline to Ask if there are specific needs or goals they have in mind before answering. when The customer asks for information about financing.
         And a guideline to Confirm their business need before recommending any financing options. when The customer describes a business problem but hasn't confirmed what they need yet.

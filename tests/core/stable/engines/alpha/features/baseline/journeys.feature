@@ -2,7 +2,6 @@ Feature: Journeys
     Background:
         Given the alpha engine
         And an agent
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
 
     Scenario: Multistep journey is partially followed 1
@@ -165,7 +164,6 @@ Feature: Journeys
 
     Scenario: Two consecutive journey steps with tools are running one after the other
         Given an agent with max iteration of 3
-        And that the agent uses the canned_fluid message composition mode
         And the journey called "Change Credit Limits"
         And a customer message, "Hi I see that my credit limit is low. Can I change it?"
         And an agent message, "Sure, I can help with that. Can you please provide your account name?"
@@ -297,7 +295,6 @@ Feature: Journeys
 
     Scenario: The journey advances correctly when pruning is needed
         Given an agent named "Digital Assistant" Whose job is to assist with bank customers
-        And that the agent uses the canned_fluid message composition mode
         And a customer named "Guest"
         And an empty session
         And the journey called "Lock Card Journey"
@@ -327,7 +324,6 @@ Feature: Journeys
 
     Scenario: Agent executes tool on first step of journey
         Given an agent named "Digital Assistant" Whose job is to assist customer get information from our clinic
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And the journey called "Simple Lab Journey"
         And a customer message, "Can you help me get my lab results? My name is Beth Harmon"
@@ -337,7 +333,6 @@ Feature: Journeys
 
     Scenario: Agent returns to root that requires tool calls on journeys reactivation
         Given an agent named "Digital Assistant" Whose job is to assist customer get information from our clinic
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And the journey called "Simple Lab Journey"
         And a customer message, "Can you help me get my lab results? My name is Beth Harmon, I'm here with my friend Bob Buckland"
@@ -354,7 +349,6 @@ Feature: Journeys
 
     Scenario: Agent chooses correct root for journey when some roots require tools 1
         Given an agent named "Digital Assistant" Whose job is to assist customer get information from our clinic
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And the journey called "Complex Lab Journey"
         And a customer message, "Can you help me get my blood results? My name is Beth Harmon"
@@ -364,7 +358,6 @@ Feature: Journeys
 
     Scenario: Agent chooses correct root for journey when some roots require tools 2
         Given an agent named "Digital Assistant" Whose job is to assist customer get information from our clinic
-        And that the agent uses the canned_fluid message composition mode
         And an empty session
         And the journey called "Complex Lab Journey"
         And a customer message, "Can you help me get the results to my brain scan? My name is Beth Harmon"
