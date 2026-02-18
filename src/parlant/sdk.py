@@ -886,6 +886,9 @@ async def _match_always(ctx: GuidelineMatchingContext, g: Guideline) -> Guidelin
     )
 
 
+MATCH_ALWAYS = _match_always
+
+
 @dataclass
 class JourneyStateMatch:
     """Result of a journey state transition match."""
@@ -4866,6 +4869,7 @@ __all__ = [
     "LoadedContext",
     "LogLevel",
     "Logger",
+    "MATCH_ALWAYS",
     "MessageEventData",
     "ModelGeneration",
     "ModelSize",
