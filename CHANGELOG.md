@@ -4,7 +4,9 @@ All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
 
-TBD
+### Changed
+
+- Adjusted log levels of relational resolver to trace instead of debug
 
 ## [3.2.1] - 2026-02-17
 
