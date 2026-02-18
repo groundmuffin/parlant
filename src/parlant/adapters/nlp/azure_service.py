@@ -512,7 +512,7 @@ class AzureTextEmbedding3Small(AzureEmbedder):
 
     @property
     def dimensions(self) -> int:
-        return 3072
+        return 1536
 
 
 class AzureService(NLPService):
@@ -628,7 +628,7 @@ Please choose one of the following authentication methods:
       - AZURE_TENANT_ID
       - AZURE_FEDERATED_TOKEN_FILE
 
-Important: For Azure AD authentication, ensure your identity has the 
+Important: For Azure AD authentication, ensure your identity has the
 "Cognitive Services OpenAI User" role on the Azure OpenAI resource.
 
 For more details on Azure AD authentication options, see:
