@@ -4,6 +4,10 @@ All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
 
+TBD
+
+## [3.2.2] - 2025-02-18
+
 ### Added
 
 - Added p.MATCH_ALWAYS, now the preferred alias to p.Guideline.MATCH_ALWAYS
