@@ -7,6 +7,7 @@ All notable changes to Parlant will be documented here.
 ### Added
 
 - Added p.MATCH_ALWAYS, now the preferred alias to p.Guideline.MATCH_ALWAYS
+- Added `logger` property to p.Server
 
 ### Changed
 

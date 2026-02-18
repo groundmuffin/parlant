@@ -3454,6 +3454,11 @@ class Server:
         return self._container
 
     @property
+    def logger(self) -> Logger:
+        """Returns the logger instance from the container."""
+        return self._container[Logger]
+
+    @property
     def ready(self) -> asyncio.Event:
         """An asyncio event that is set when the server is ready to accept requests."""
         return self._ready_event
