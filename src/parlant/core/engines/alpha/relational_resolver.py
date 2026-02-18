@@ -114,7 +114,7 @@ class RelationalResolver:
                 current_journeys = list(journeys)
 
                 for iteration in range(self.MAX_ITERATIONS):
-                    self._logger.debug(f"RelationalResolver iteration {iteration + 1}")
+                    self._logger.trace(f"RelationalResolver iteration {iteration + 1}")
 
                     # Step 1: Apply dependencies (filter out matches with unmet dependencies)
                     filtered_by_dependencies = await self._apply_dependencies(
@@ -146,7 +146,7 @@ class RelationalResolver:
                     if self._matches_equal(new_matches, current_matches) and self._journeys_equal(
                         new_journeys, current_journeys
                     ):
-                        self._logger.debug(
+                        self._logger.trace(
                             f"RelationalResolver converged after {iteration + 1} iteration(s)"
                         )
                         break
@@ -154,7 +154,7 @@ class RelationalResolver:
                     current_matches = new_matches
                     current_journeys = new_journeys
                 else:
-                    self._logger.debug(
+                    self._logger.trace(
                         f"RelationalResolver reached max iterations ({self.MAX_ITERATIONS})"
                     )
 
