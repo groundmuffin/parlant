@@ -4,6 +4,10 @@ All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added p.MATCH_ALWAYS, now the preferred alias to p.Guideline.MATCH_ALWAYS
+
 ### Changed
 
 - Adjusted log levels of relational resolver to trace instead of debug
