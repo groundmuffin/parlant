@@ -315,8 +315,8 @@ def _tool_decorator_impl(
             "A tool function must accept a parameter 'context: ToolContext'"
         )
 
-        assert parameters[0].name == "context", (
-            "A tool function's first parameter must be 'context: ToolContext'"
+        assert parameters[0].name in ["context", "ctx", "c"], (
+            "A tool function's first parameter must be named 'context', 'ctx', or 'c'"
         )
         assert parameters[0].annotation == ToolContext, (
             "A tool function's first parameter must be 'context: ToolContext'"
