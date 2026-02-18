@@ -4766,6 +4766,9 @@ class Server:
                     "server": self,
                     "container": c,
                 },
+                context_vars={
+                    self._current_server_var: self,
+                },
             )
 
             await c[ServiceRegistry].update_tool_service(
