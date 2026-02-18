@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 import asyncio
+import contextvars
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import enum
@@ -517,6 +518,7 @@ class PluginServer:
         on_app_created: Callable[[FastAPI], Awaitable[FastAPI]] | None = None,
         plugin_data: Mapping[str, Any] = {},
         hosted: bool = False,
+        context_vars: Mapping[contextvars.ContextVar[Any], Any] = {},
     ) -> None:
         self.tools = {entry.tool.name: entry for entry in tools}
         self.plugin_data = plugin_data
@@ -524,6 +526,7 @@ class PluginServer:
         self.port = port
         self.hosted = hosted
         self.url = f"http://{self.host}:{self.port}"
+        self.context_vars = context_vars
 
         self._on_app_created = on_app_created
 
@@ -641,6 +644,10 @@ class PluginServer:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Tool: '{name}' does not exists",
                 )
+
+            # Restore context vars for same-process hosted mode
+            for var, value in self.context_vars.items():
+                var.set(value)
 
             # Restore EngineContext if context_id was provided (same-process hosted mode)
             if request.engine_context_id and request.engine_context_id in _engine_context_registry:

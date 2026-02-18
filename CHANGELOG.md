@@ -17,6 +17,7 @@ All notable changes to Parlant will be documented here.
 ### Fixed
 
 - Fix completed streamed messages re-animating on page refresh
+- Propagate `Server.current` context to tool functions in hosted plugin server
 
 ## [3.2.1] - 2026-02-17
 
