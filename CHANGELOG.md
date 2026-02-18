@@ -7,6 +7,7 @@ All notable changes to Parlant will be documented here.
 ### Changed
 
 - Adjusted log levels of relational resolver to trace instead of debug
+- Allow tool context parameter names to be all of 'context', 'ctx', and 'c'
 
 ### Fixed
 
