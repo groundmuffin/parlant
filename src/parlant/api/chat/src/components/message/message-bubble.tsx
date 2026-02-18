@@ -41,10 +41,13 @@ const MessageBubble = ({event, isFirstMessageInDate, showLogs, isContinual, show
 	const [session] = useAtom(sessionAtom);
 
 	// Buffered reveal system: gradually reveal text at a controlled rate
-	const [revealedLength, setRevealedLength] = useState(0);
-	const [animatedLength, setAnimatedLength] = useState(0); // tracks what's been animated (for fade effect)
 	const messageText = event?.data?.message || '';
-	const revealedLengthRef = useRef(0);
+	const chunks = event?.data?.chunks;
+	const isAlreadyComplete = chunks !== undefined && chunks.length > 0 && chunks[chunks.length - 1] === null;
+
+	const [revealedLength, setRevealedLength] = useState(isAlreadyComplete ? messageText.length : 0);
+	const [animatedLength, setAnimatedLength] = useState(isAlreadyComplete ? messageText.length : 0); // tracks what's been animated (for fade effect)
+	const revealedLengthRef = useRef(isAlreadyComplete ? messageText.length : 0);
 	const animationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -146,7 +149,6 @@ const MessageBubble = ({event, isFirstMessageInDate, showLogs, isContinual, show
 	// Check if streaming is in progress (chunks property exists and not yet terminated with null)
 	// chunks === undefined means block mode, chunks === [] means streaming started but no chunks yet,
 	// chunks with null as last element means streaming is complete
-	const chunks = event?.data?.chunks;
 	const isStreaming = chunks !== undefined && (chunks.length === 0 || chunks[chunks.length - 1] !== null);
 
 	// Check if we're still revealing text (either streaming, reveal hasn't caught up, or animation hasn't caught up)

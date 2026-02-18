@@ -8,6 +8,10 @@ All notable changes to Parlant will be documented here.
 
 - Adjusted log levels of relational resolver to trace instead of debug
 
+### Fixed
+
+- Fix completed streamed messages re-animating on page refresh
+
 ## [3.2.1] - 2026-02-17
 
 ### Added
