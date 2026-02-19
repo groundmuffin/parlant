@@ -4,7 +4,7 @@ All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
 
-TBD
+- Add staged_events to GuidelineMatchingContext in SDK
 
 ## [3.2.2] - 2025-02-18
 
@@ -12,7 +12,6 @@ TBD
 
 - Added p.MATCH_ALWAYS, now the preferred alias to p.Guideline.MATCH_ALWAYS
 - Added `logger` property to p.Server
-- Add staged_events to GuidelineMatchingContext in SDK
 
 ### Changed
 
