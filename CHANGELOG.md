@@ -12,6 +12,7 @@ TBD
 
 - Added p.MATCH_ALWAYS, now the preferred alias to p.Guideline.MATCH_ALWAYS
 - Added `logger` property to p.Server
+- Add staged_events to GuidelineMatchingContext in SDK
 
 ### Changed
 
