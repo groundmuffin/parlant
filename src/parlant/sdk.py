@@ -933,6 +933,7 @@ class Guideline:
     _container: Container
 
     labels: set[str] = field(default_factory=set)
+    priority: int = 0
 
     async def entail(self, guideline: Guideline) -> Relationship:
         """Creates an entailment relationship with another guideline."""
@@ -2199,6 +2200,7 @@ class Journey:
     _container: Container
 
     labels: set[str] = field(default_factory=set)
+    priority: int = 0
 
     @property
     def initial_state(self) -> InitialJourneyState:
@@ -2372,6 +2374,7 @@ class Journey:
         track: bool = True,
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
+        priority: int = 0,
     ) -> Guideline:
         """Creates a guideline with the specified condition and action, as well as (optionally) tools to achieve its task."""
         guideline = await self._server._create_guideline(
@@ -2392,6 +2395,7 @@ class Journey:
             id=id,
             track=track,
             labels=labels,
+            priority=priority,
         )
 
         if dependencies:
@@ -2413,6 +2417,7 @@ class Journey:
         | None = None,
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
+        priority: int = 0,
     ) -> Guideline:
         """A shorthand for creating an observational guideline with the specified condition."""
 
@@ -2427,6 +2432,7 @@ class Journey:
             canned_response_field_provider=canned_response_field_provider,
             labels=labels,
             dependencies=dependencies,
+            priority=priority,
         )
 
     async def attach_tool(
@@ -2879,6 +2885,7 @@ class Agent:
         on_message: Callable[[EngineContext, JourneyMatch], Awaitable[None]] | None = None,
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
+        priority: int = 0,
     ) -> Journey:
         """Creates a new journey with the specified title, description, and conditions."""
 
@@ -2893,6 +2900,7 @@ class Agent:
             on_match=on_match,
             on_message=on_message,
             labels=labels,
+            priority=priority,
         )
 
         await self.attach_journey(journey)
@@ -2907,6 +2915,7 @@ class Agent:
             transitions=journey.transitions,
             composition_mode=journey.composition_mode,
             labels=journey.labels,
+            priority=journey.priority,
             _start_state_id=journey._start_state_id,
             _server=self._server,
             _container=self._container,
@@ -2945,6 +2954,7 @@ class Agent:
         track: bool = True,
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
+        priority: int = 0,
     ) -> Guideline:
         """Creates a guideline with the specified condition and action, as well as (optionally) tools to achieve its task."""
         guideline = await self._server._create_guideline(
@@ -2965,6 +2975,7 @@ class Agent:
             id=id,
             track=track,
             labels=labels,
+            priority=priority,
         )
 
         if dependencies:
@@ -2987,6 +2998,7 @@ class Agent:
         | None = None,
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
+        priority: int = 0,
     ) -> Guideline:
         """A shorthand for creating an observational guideline with the specified condition."""
 
@@ -3002,6 +3014,7 @@ class Agent:
             canned_response_field_provider=canned_response_field_provider,
             labels=labels,
             dependencies=dependencies,
+            priority=priority,
         )
 
     async def attach_tool(
@@ -3633,6 +3646,7 @@ class Server:
         id: GuidelineId | None = None,
         track: bool = True,
         labels: Iterable[str] = (),
+        priority: int = 0,
     ) -> Guideline:
         """Internal method to create a guideline with common logic."""
         if condition is None and matcher is None and action is None:
@@ -3660,6 +3674,7 @@ class Server:
             tags=tags,
             track=track,
             labels=set(labels) if labels else None,
+            priority=priority,
         )
 
         if canned_responses:
@@ -3706,6 +3721,7 @@ class Server:
             tags=guideline.tags,
             metadata=guideline.metadata,
             labels=guideline.labels,
+            priority=guideline.priority,
             _server=self,
             _container=self.container,
         )
@@ -4446,6 +4462,7 @@ class Server:
         on_match: Callable[[EngineContext, JourneyMatch], Awaitable[None]] | None = None,
         on_message: Callable[[EngineContext, JourneyMatch], Awaitable[None]] | None = None,
         labels: Iterable[str] = (),
+        priority: int = 0,
     ) -> Journey:
         """Creates a new journey with the specified title, description, and conditions."""
 
@@ -4486,6 +4503,7 @@ class Server:
             id=id,
             composition_mode=CompositionMode._to_core_composition_mode(composition_mode),
             labels=set(labels) if labels else None,
+            priority=priority,
         )
 
         journey = Journey(
@@ -4500,6 +4518,7 @@ class Server:
                 stored_journey.composition_mode
             ),
             labels=stored_journey.labels,
+            priority=stored_journey.priority,
             _start_state_id=stored_journey.root_id,
             _server=self,
             _container=self._container,

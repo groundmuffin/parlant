@@ -66,6 +66,7 @@ class JourneyModule:
         id: JourneyId | None = None,
         composition_mode: CompositionMode | None = None,
         labels: Set[str] | None = None,
+        priority: int = 0,
     ) -> tuple[Journey, Sequence[Guideline]]:
         guidelines = [
             await self._guideline_store.create_guideline(
@@ -84,6 +85,7 @@ class JourneyModule:
             id=id,
             composition_mode=composition_mode,
             labels=labels,
+            priority=priority,
         )
 
         for guideline in guidelines:
@@ -120,6 +122,7 @@ class JourneyModule:
         tags: JourneyTagUpdateParams | None,
         composition_mode: CompositionMode | None = None,
         labels: JourneyLabelsUpdateParams | None = None,
+        priority: int | None = None,
     ) -> Journey:
         journey = await self._journey_store.read_journey(journey_id=journey_id)
 
@@ -130,6 +133,8 @@ class JourneyModule:
             update_params["description"] = description
         if composition_mode is not None:
             update_params["composition_mode"] = composition_mode
+        if priority is not None:
+            update_params["priority"] = priority
 
         if update_params:
             journey = await self._journey_store.update_journey(

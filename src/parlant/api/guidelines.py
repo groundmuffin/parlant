@@ -250,6 +250,7 @@ class GuidelineCreationParamsDTO(
     composition_mode: CompositionModeDTO | None = None
     track: bool = True
     labels: GuidelineLabelsField | None = None
+    priority: int = 0
 
 
 GuidelineMetadataUnsetField: TypeAlias = Annotated[
@@ -321,6 +322,7 @@ class GuidelineUpdateParamsDTO(
     metadata: GuidelineMetadataUpdateParamsDTO | None = None
     composition_mode: CompositionModeDTO | None = None
     labels: GuidelineLabelsUpdateParamsDTO | None = None
+    priority: int | None = None
 
 
 guideline_with_relationships_example: ExampleJson = {
@@ -444,6 +446,7 @@ def _guideline_relationship_to_dto(
             else None,
             track=rel_source_guideline.track,
             labels=rel_source_guideline.labels,
+            priority=rel_source_guideline.priority,
         )
         if relationship.source_type == RelationshipEntityKind.GUIDELINE
         else None,
@@ -471,6 +474,7 @@ def _guideline_relationship_to_dto(
             else None,
             track=rel_target_guideline.track,
             labels=rel_target_guideline.labels,
+            priority=rel_target_guideline.priority,
         )
         if relationship.target_type == RelationshipEntityKind.GUIDELINE
         else None,
@@ -539,6 +543,7 @@ def create_router(
                 else None,
                 track=params.track,
                 labels=params.labels,
+                priority=params.priority,
             )
         except ValueError as e:
             raise HTTPException(
@@ -560,6 +565,7 @@ def create_router(
             else None,
             track=guideline.track,
             labels=guideline.labels,
+            priority=guideline.priority,
         )
 
     @router.get(
@@ -606,6 +612,7 @@ def create_router(
                 else None,
                 track=guideline.track,
                 labels=guideline.labels,
+                priority=guideline.priority,
             )
             for guideline in guidelines
         ]
@@ -669,6 +676,7 @@ def create_router(
                 else None,
                 track=guideline.track,
                 labels=guideline.labels,
+                priority=guideline.priority,
             ),
             relationships=[
                 _guideline_relationship_to_dto(relationship, indirect)
@@ -768,6 +776,7 @@ def create_router(
             )
             if params.labels
             else None,
+            priority=params.priority,
         )
 
         guideline_tool_associations = await app.guidelines.find_tool_associations(guideline_id)
@@ -789,6 +798,7 @@ def create_router(
                 else None,
                 track=updated_guideline.track,
                 labels=updated_guideline.labels,
+                priority=updated_guideline.priority,
             ),
             relationships=[
                 _guideline_relationship_to_dto(relationship, indirect)

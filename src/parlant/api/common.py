@@ -344,6 +344,7 @@ class GuidelineDTO(
     composition_mode: CompositionModeDTO | None = None
     track: bool = True
     labels: GuidelineLabelsField = set()
+    priority: int = 0
 
 
 EnumValueTypeDTO: TypeAlias = str | int

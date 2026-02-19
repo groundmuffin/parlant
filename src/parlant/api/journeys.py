@@ -154,6 +154,7 @@ class JourneyDTO(
     tags: JourneyTagsField = []
     composition_mode: CompositionModeDTO | None = None
     labels: JourneyLabelsField = set()
+    priority: int = 0
 
 
 class JourneyCreationParamsDTO(
@@ -171,6 +172,7 @@ class JourneyCreationParamsDTO(
     tags: JourneyTagsField | None = None
     composition_mode: CompositionModeDTO | None = None
     labels: JourneyLabelsField | None = None
+    priority: int = 0
 
 
 JourneyConditionUpdateAddField: TypeAlias = Annotated[
@@ -286,6 +288,7 @@ class JourneyUpdateParamsDTO(
     tags: JourneyTagUpdateParamsDTO | None = None
     composition_mode: CompositionModeDTO | None = None
     labels: JourneyLabelsUpdateParamsDTO | None = None
+    priority: int | None = None
 
 
 TagIdQuery: TypeAlias = Annotated[
@@ -471,6 +474,7 @@ def create_router(
             if params.composition_mode
             else None,
             labels=params.labels,
+            priority=params.priority,
         )
 
         return JourneyDTO(
@@ -483,6 +487,7 @@ def create_router(
             if journey.composition_mode
             else None,
             labels=journey.labels,
+            priority=journey.priority,
         )
 
     @router.get(
@@ -523,6 +528,7 @@ def create_router(
                     if journey.composition_mode
                     else None,
                     labels=journey.labels,
+                    priority=journey.priority,
                 )
             )
 
@@ -566,6 +572,7 @@ def create_router(
             if model.journey.composition_mode
             else None,
             labels=model.journey.labels,
+            priority=model.journey.priority,
         )
 
     @router.get(
@@ -646,6 +653,7 @@ def create_router(
             )
             if params.labels
             else None,
+            priority=params.priority,
         )
 
         return JourneyDTO(
@@ -658,6 +666,7 @@ def create_router(
             if journey.composition_mode
             else None,
             labels=journey.labels,
+            priority=journey.priority,
         )
 
     @router.delete(

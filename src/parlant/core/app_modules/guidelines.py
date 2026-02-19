@@ -98,6 +98,7 @@ class GuidelineModule:
         composition_mode: CompositionMode | None = None,
         track: bool = True,
         labels: Set[str] | None = None,
+        priority: int = 0,
     ) -> Guideline:
         if tags:
             for tag_id in tags:
@@ -117,6 +118,7 @@ class GuidelineModule:
             composition_mode=composition_mode,
             track=track,
             labels=labels,
+            priority=priority,
         )
 
         return guideline
@@ -151,6 +153,7 @@ class GuidelineModule:
         metadata: GuidelineMetadataUpdateParams | None,
         composition_mode: CompositionMode | None = None,
         labels: GuidelineLabelsUpdateParams | None = None,
+        priority: int | None = None,
     ) -> Guideline:
         _ = await self._guideline_store.read_guideline(guideline_id=guideline_id)
 
@@ -161,6 +164,7 @@ class GuidelineModule:
             or criticality is not None
             or enabled is not None
             or composition_mode is not None
+            or priority is not None
         ):
             update_params: GuidelineUpdateParams = {}
             if condition:
@@ -175,6 +179,8 @@ class GuidelineModule:
                 update_params["enabled"] = enabled
             if composition_mode is not None:
                 update_params["composition_mode"] = composition_mode
+            if priority is not None:
+                update_params["priority"] = priority
 
             await self._guideline_store.update_guideline(
                 guideline_id=guideline_id,

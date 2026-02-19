@@ -95,6 +95,7 @@ class Journey:
     tags: Sequence[TagId]
     composition_mode: Optional[CompositionMode] = None
     labels: Set[str] = field(default_factory=set)
+    priority: int = 0
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -104,6 +105,7 @@ class JourneyUpdateParams(TypedDict, total=False):
     title: str
     description: str
     composition_mode: Optional[CompositionMode]
+    priority: int
 
 
 class JourneyNodeUpdateParams(TypedDict, total=False):
@@ -134,6 +136,7 @@ class JourneyStore(ABC):
         id: Optional[JourneyId] = None,
         composition_mode: Optional[CompositionMode] = None,
         labels: Optional[Set[str]] = None,
+        priority: int = 0,
     ) -> Journey: ...
 
     @abstractmethod
@@ -375,6 +378,17 @@ class JourneyDocument_v0_4_0(TypedDict, total=False):
     composition_mode: Optional[str]
 
 
+class JourneyDocument_v0_5_0(TypedDict, total=False):
+    id: ObjectId
+    version: Version.String
+    creation_utc: str
+    title: str
+    description: str
+    root_id: JourneyNodeId
+    composition_mode: Optional[str]
+    labels: Sequence[str]
+
+
 class JourneyDocument(TypedDict, total=False):
     id: ObjectId
     version: Version.String
@@ -384,6 +398,7 @@ class JourneyDocument(TypedDict, total=False):
     root_id: JourneyNodeId
     composition_mode: Optional[str]
     labels: Sequence[str]
+    priority: int
 
 
 class JourneyConditionAssociationDocument(TypedDict, total=False):
@@ -453,7 +468,7 @@ class JourneyTagAssociationDocument(TypedDict, total=False):
 
 
 class JourneyVectorStore(JourneyStore):
-    VERSION = Version.from_string("0.5.0")
+    VERSION = Version.from_string("0.6.0")
 
     def __init__(
         self,
@@ -515,7 +530,7 @@ class JourneyVectorStore(JourneyStore):
 
         async def v0_4_0_to_v0_5_0(doc: BaseDocument) -> Optional[BaseDocument]:
             d = cast(JourneyDocument_v0_4_0, doc)
-            return JourneyDocument(
+            return JourneyDocument_v0_5_0(
                 id=d["id"],
                 version=Version.String("0.5.0"),
                 creation_utc=d["creation_utc"],
@@ -524,6 +539,20 @@ class JourneyVectorStore(JourneyStore):
                 root_id=d["root_id"],
                 composition_mode=d.get("composition_mode"),
                 labels=[],  # Default to empty labels for existing journeys
+            )
+
+        async def v0_5_0_to_v0_6_0(doc: BaseDocument) -> Optional[BaseDocument]:
+            d = cast(JourneyDocument_v0_5_0, doc)
+            return JourneyDocument(
+                id=d["id"],
+                version=Version.String("0.6.0"),
+                creation_utc=d["creation_utc"],
+                title=d["title"],
+                description=d["description"],
+                root_id=d["root_id"],
+                composition_mode=d.get("composition_mode"),
+                labels=d.get("labels", []),
+                priority=0,  # Default to 0 for existing journeys
             )
 
         async def v0_1_0_to_v0_3_0(doc: BaseDocument) -> Optional[BaseDocument]:
@@ -538,6 +567,7 @@ class JourneyVectorStore(JourneyStore):
                 "0.2.0": v0_1_0_to_v0_3_0,
                 "0.3.0": v0_3_0_to_v0_4_0,
                 "0.4.0": v0_4_0_to_v0_5_0,
+                "0.5.0": v0_5_0_to_v0_6_0,
             },
         ).migrate(doc)
 
@@ -710,6 +740,7 @@ class JourneyVectorStore(JourneyStore):
             root_id=journey.root_id,
             composition_mode=(journey.composition_mode.value if journey.composition_mode else None),
             labels=list(journey.labels),
+            priority=journey.priority,
         )
 
     async def _deserialize(self, doc: JourneyDocument) -> Journey:
@@ -738,6 +769,7 @@ class JourneyVectorStore(JourneyStore):
             tags=tags,
             composition_mode=composition_mode,
             labels=set(doc.get("labels", [])),
+            priority=doc.get("priority", 0),
         )
 
     def _serialize_node(
@@ -824,6 +856,7 @@ class JourneyVectorStore(JourneyStore):
         id: Optional[JourneyId] = None,
         composition_mode: Optional[CompositionMode] = None,
         labels: Optional[Set[str]] = None,
+        priority: int = 0,
     ) -> Journey:
         async with self._lock.writer_lock:
             creation_utc = creation_utc or datetime.now(timezone.utc)
@@ -864,6 +897,7 @@ class JourneyVectorStore(JourneyStore):
                 tags=tags or [],
                 composition_mode=composition_mode,
                 labels=labels or set(),
+                priority=priority,
             )
 
             content = self.assemble_content(
