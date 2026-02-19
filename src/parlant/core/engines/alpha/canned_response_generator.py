@@ -98,6 +98,12 @@ class BasicNoMatchResponseProvider(NoMatchResponseProvider):
         return self.template
 
 
+def _format_guideline(condition: str, action: str) -> str:
+    if condition:
+        return f"When {condition}, then {action}"
+    return action
+
+
 class CannedResponseDraftSchema(DefaultBaseModel):
     last_message_of_user: Optional[str]
     guidelines: list[str]
@@ -352,16 +358,9 @@ class GenerativeFieldExtraction(CannedResponseFieldExtractionMethod):
         ) -> str:
             guidelines_texts = []
             for i, p in enumerate(all_matches, start=1):
-                if p.guideline.content.action:
-                    internal_representation = guideline_representations[p.guideline.id]
-
-                    if internal_representation.condition:
-                        guideline = f"Guideline #{i}) When {guideline_representations[p.guideline.id].condition}, then {guideline_representations[p.guideline.id].action}"
-                    else:
-                        guideline = (
-                            f"Guideline #{i}) {guideline_representations[p.guideline.id].action}"
-                        )
-
+                rep = guideline_representations[p.guideline.id]
+                if rep.action:
+                    guideline = f"Guideline #{i}) {_format_guideline(rep.condition, rep.action)}"
                     guideline += f"\n    [Priority (1-10): {p.score}; Rationale: {p.rationale}]"
                     guidelines_texts.append(guideline)
             return "\n".join(guidelines_texts)
@@ -1317,16 +1316,10 @@ However, in this case, no special behavioral guidelines were provided.
         agent_intention_guidelines = []
 
         for i, p in enumerate(all_matches, start=1):
-            internal_rep = internal_representation(p.guideline)
+            rep = guideline_representations[p.guideline.id]
 
-            if internal_rep.action:
-                if internal_rep.condition:
-                    guideline = f"Guideline #{i}) When {guideline_representations[p.guideline.id].condition}, then {guideline_representations[p.guideline.id].action}"
-                else:
-                    guideline = (
-                        f"Guideline #{i}) {guideline_representations[p.guideline.id].action}"
-                    )
-
+            if rep.action:
+                guideline = f"Guideline #{i}) {_format_guideline(rep.condition, rep.action)}"
                 guideline += f"\n    [Priority (1-10): {p.score}; Rationale: {p.rationale}]"
                 if p.guideline.metadata.get("agent_intention_condition"):
                     agent_intention_guidelines.append(guideline)
@@ -1684,14 +1677,14 @@ Produce a valid JSON object according to the following spec. Use the values prov
         else:
             last_user_message = ""
 
-        guidelines_list_text = ", ".join(
-            [
-                f'"When {internal_representation(g.guideline).condition}, then {internal_representation(g.guideline).action}"'
-                for g in guidelines
-                if internal_representation(g.guideline).action
-                and not g.guideline.criticality == Criticality.LOW
-            ]
-        )
+        guidelines_list_items = []
+        for g in guidelines:
+            internal_rep = internal_representation(g.guideline)
+            if internal_rep.action and not g.guideline.criticality == Criticality.LOW:
+                guidelines_list_items.append(
+                    f'"{_format_guideline(internal_rep.condition, internal_rep.action)}"'
+                )
+        guidelines_list_text = ", ".join(guidelines_list_items)
 
         return f"""
 {{
@@ -1897,12 +1890,13 @@ in order to run tools. You should inform the user about this invalid data: ###
             )
 
         # Format guideline recap (use condition + action format)
-        guideline_recap_items = [
-            f"- When {internal_representation(m.guideline).condition}, "
-            f"{internal_representation(m.guideline).action}"
-            for m in chain(ordinary_guideline_matches, tool_enabled_guideline_matches)
-            if internal_representation(m.guideline).action
-        ]
+        guideline_recap_items = []
+        for m in chain(ordinary_guideline_matches, tool_enabled_guideline_matches):
+            internal_rep = internal_representation(m.guideline)
+            if internal_rep.action:
+                guideline_recap_items.append(
+                    f"- {_format_guideline(internal_rep.condition, internal_rep.action)}"
+                )
 
         # Build recap section
         recap_parts = []
