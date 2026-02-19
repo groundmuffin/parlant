@@ -172,6 +172,7 @@ from parlant.core.relationships import (
 from parlant.core.services.indexing.behavioral_change_evaluation import BehavioralChangeEvaluator
 from parlant.core.services.tools.service_registry import ServiceDocumentRegistry, ServiceRegistry
 from parlant.core.sessions import (
+    Event,
     EventKind,
     EventSource,
     MessageEventData,
@@ -845,6 +846,7 @@ class GuidelineMatchingContext:
     agent: Agent
     customer: Customer
     variables: Mapping[Variable, JSONSerializable]
+    staged_events: Sequence[EmittedEvent]
 
     @classmethod
     async def _from_core(
@@ -875,6 +877,7 @@ class GuidelineMatchingContext:
                 await agent.get_variable(id=var.id): val.data
                 for var, val in core_ctx.context_variables
             },
+            staged_events=core_ctx.staged_events,
         )
 
 
@@ -4857,6 +4860,7 @@ __all__ = [
     "EngineHookResult",
     "EngineHooks",
     "EstimatingTokenizer",
+    "Event",
     "EventKind",
     "EventSource",
     "FallbackSchematicGenerator",
