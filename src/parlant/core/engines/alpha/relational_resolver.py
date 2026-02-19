@@ -158,6 +158,15 @@ class RelationalResolver:
                         f"RelationalResolver reached max iterations ({self.MAX_ITERATIONS})"
                     )
 
+                # Step 4: Apply priority filtering
+                # After all relational resolution has converged, filter to keep
+                # only entities sharing the highest priority value.
+                current_matches, current_journeys = self._apply_priority_filtering(
+                    current_matches,
+                    current_journeys,
+                    deactivation_reasons,
+                )
+
                 # Emit tracer events for final results
                 final_match_ids = {m.guideline.id for m in current_matches}
                 matches_by_id = {m.guideline.id: m for m in list(matches) + current_matches}
@@ -500,6 +509,59 @@ class RelationalResolver:
         filtered_journeys = [j for j in journeys if j.id not in deprioritized_journey_ids]
 
         return RelationalResolverResult(matches=final_result, journeys=filtered_journeys)
+
+    def _apply_priority_filtering(
+        self,
+        matches: Sequence[GuidelineMatch],
+        journeys: Sequence[Journey],
+        deactivation_reasons: dict[GuidelineId, str],
+    ) -> tuple[list[GuidelineMatch], list[Journey]]:
+        """Filter to keep only entities sharing the highest priority value.
+
+        For standalone guidelines, the effective priority is the guideline's own priority.
+        For journey-associated guidelines, the effective priority is the journey's priority.
+        """
+        if not matches and not journeys:
+            return [], []
+
+        journey_priority_by_id = {j.id: j.priority for j in journeys}
+
+        # Determine effective priority for each match
+        match_priorities: list[tuple[GuidelineMatch, int]] = []
+        for match in matches:
+            journey_id = self._extract_journey_id_from_guideline(match.guideline)
+            if journey_id and cast(JourneyId, journey_id) in journey_priority_by_id:
+                effective_priority = journey_priority_by_id[cast(JourneyId, journey_id)]
+            else:
+                effective_priority = match.guideline.priority
+            match_priorities.append((match, effective_priority))
+
+        # Find the max priority across all matches and journeys
+        all_priorities = [p for _, p in match_priorities] + [j.priority for j in journeys]
+
+        if not all_priorities:
+            return list(matches), list(journeys)
+
+        max_priority = max(all_priorities)
+
+        # Filter matches
+        filtered_matches = []
+        for match, priority in match_priorities:
+            if priority >= max_priority:
+                filtered_matches.append(match)
+            else:
+                self._logger.debug(
+                    f"Skipped: Guideline {match.guideline.id} ({match.guideline.content.action}) "
+                    f"filtered due to lower priority ({priority} < {max_priority})"
+                )
+                deactivation_reasons[match.guideline.id] = (
+                    f"Filtered due to lower priority ({priority} < {max_priority})"
+                )
+
+        # Filter journeys
+        filtered_journeys = [j for j in journeys if j.priority >= max_priority]
+
+        return filtered_matches, filtered_journeys
 
     async def _apply_entailment(
         self,

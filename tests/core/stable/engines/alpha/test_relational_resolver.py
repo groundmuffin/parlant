@@ -1154,3 +1154,208 @@ async def test_that_relational_resolver_handles_priority_affecting_dependency_in
     assert len(result.matches) == 2
     assert any(m.guideline.id == guideline_a.id for m in result.matches)
     assert any(m.guideline.id == guideline_z.id for m in result.matches)
+
+
+async def test_that_relational_resolver_filters_guidelines_by_priority_keeping_only_highest(
+    container: Container,
+) -> None:
+    """
+    Tests that after all relational resolution, only guidelines sharing the
+    highest priority value survive.
+
+    - Guideline A has priority=1
+    - Guideline B has priority=0 (default)
+    - Both are active matches with no relationships between them
+    - Expected: Only A survives because it has the highest priority
+    """
+    guideline_store = container[GuidelineStore]
+    resolver = container[RelationalResolver]
+
+    guideline_a = await guideline_store.create_guideline(
+        condition="Customer asks about pricing",
+        action="Provide premium pricing",
+        priority=1,
+    )
+    guideline_b = await guideline_store.create_guideline(
+        condition="Customer asks about pricing",
+        action="Provide standard pricing",
+        priority=0,
+    )
+
+    result = await resolver.resolve(
+        [guideline_a, guideline_b],
+        [
+            GuidelineMatch(guideline=guideline_a, score=8, rationale=""),
+            GuidelineMatch(guideline=guideline_b, score=9, rationale=""),
+        ],
+        journeys=[],
+    )
+
+    assert len(result.matches) == 1
+    assert result.matches[0].guideline.id == guideline_a.id
+
+
+async def test_that_relational_resolver_filters_journeys_by_priority_keeping_only_highest(
+    container: Container,
+) -> None:
+    """
+    Tests that after all relational resolution, only journeys sharing the
+    highest priority value (and their guidelines) survive.
+
+    - Journey 1 has priority=2
+    - Journey 2 has priority=0 (default)
+    - Both journeys' guidelines are active matches
+    - Expected: Only Journey 1's guidelines survive
+    """
+    guideline_store = container[GuidelineStore]
+    journey_store = container[JourneyStore]
+    projection = container[JourneyGuidelineProjection]
+    resolver = container[RelationalResolver]
+
+    j1_condition = await guideline_store.create_guideline(
+        condition="Customer is interested in Journey 1"
+    )
+    j2_condition = await guideline_store.create_guideline(
+        condition="Customer is interested in Journey 2"
+    )
+
+    j1 = await journey_store.create_journey(
+        title="Journey 1",
+        description="High priority journey",
+        conditions=[j1_condition.id],
+        priority=2,
+    )
+
+    j2 = await journey_store.create_journey(
+        title="Journey 2",
+        description="Default priority journey",
+        conditions=[j2_condition.id],
+        priority=0,
+    )
+
+    j1_guidelines = await projection.project_journey_to_guidelines(j1.id)
+    j2_guidelines = await projection.project_journey_to_guidelines(j2.id)
+
+    assert len(j1_guidelines) == 1
+    assert len(j2_guidelines) == 1
+
+    result = await resolver.resolve(
+        list(j1_guidelines) + list(j2_guidelines),
+        [
+            GuidelineMatch(guideline=j1_guidelines[0], score=8, rationale=""),
+            GuidelineMatch(guideline=j2_guidelines[0], score=9, rationale=""),
+        ],
+        journeys=[j1, j2],
+    )
+
+    assert len(result.matches) == 1
+    assert result.matches[0].guideline.id == j1_guidelines[0].id
+    assert len(result.journeys) == 1
+    assert result.journeys[0].id == j1.id
+
+
+async def test_that_relational_resolver_filters_mixed_entities_by_priority_with_prioritized_guideline_to_keep_only_the_guideline(
+    container: Container,
+) -> None:
+    """
+    Tests cross-entity priority comparison between standalone guidelines and journeys.
+
+    - Standalone guideline has priority=1
+    - Journey has priority=0 (default)
+    - Both are active
+    - Expected: Only the standalone guideline survives; the journey and its
+      guidelines are filtered out because priority=0 < priority=1
+    """
+    guideline_store = container[GuidelineStore]
+    journey_store = container[JourneyStore]
+    projection = container[JourneyGuidelineProjection]
+    resolver = container[RelationalResolver]
+
+    standalone_guideline = await guideline_store.create_guideline(
+        condition="Customer asks about drinks",
+        action="Recommend water",
+        priority=1,
+    )
+
+    journey_condition = await guideline_store.create_guideline(
+        condition="Customer asks about drinks"
+    )
+
+    journey = await journey_store.create_journey(
+        title="Drink Recommendation Journey",
+        description="Recommend soda",
+        conditions=[journey_condition.id],
+        priority=0,
+    )
+
+    journey_guidelines = await projection.project_journey_to_guidelines(journey.id)
+    assert len(journey_guidelines) > 0
+
+    journey_matches = [
+        GuidelineMatch(guideline=g, score=7 + i, rationale="")
+        for i, g in enumerate(journey_guidelines)
+    ]
+
+    result = await resolver.resolve(
+        [standalone_guideline] + list(journey_guidelines),
+        [GuidelineMatch(guideline=standalone_guideline, score=8, rationale="")] + journey_matches,
+        journeys=[journey],
+    )
+
+    assert len(result.matches) == 1
+    assert result.matches[0].guideline.id == standalone_guideline.id
+    assert len(result.journeys) == 0
+
+
+async def test_that_relational_resolver_filters_mixed_entities_by_priority_with_prioritized_journey_to_keep_only_the_journey(
+    container: Container,
+) -> None:
+    """
+    Tests cross-entity priority comparison where the journey has higher priority.
+
+    - Standalone guideline has priority=0 (default)
+    - Journey has priority=1
+    - Both are active
+    - Expected: Only the journey and its guidelines survive; the standalone
+      guideline is filtered out because priority=0 < priority=1
+    """
+    guideline_store = container[GuidelineStore]
+    journey_store = container[JourneyStore]
+    projection = container[JourneyGuidelineProjection]
+    resolver = container[RelationalResolver]
+
+    standalone_guideline = await guideline_store.create_guideline(
+        condition="Customer asks about drinks",
+        action="Recommend water",
+        priority=0,
+    )
+
+    journey_condition = await guideline_store.create_guideline(
+        condition="Customer asks about drinks"
+    )
+
+    journey = await journey_store.create_journey(
+        title="Drink Recommendation Journey",
+        description="Recommend soda",
+        conditions=[journey_condition.id],
+        priority=1,
+    )
+
+    journey_guidelines = await projection.project_journey_to_guidelines(journey.id)
+    assert len(journey_guidelines) > 0
+
+    journey_matches = [
+        GuidelineMatch(guideline=g, score=7 + i, rationale="")
+        for i, g in enumerate(journey_guidelines)
+    ]
+
+    result = await resolver.resolve(
+        [standalone_guideline] + list(journey_guidelines),
+        [GuidelineMatch(guideline=standalone_guideline, score=10, rationale="")] + journey_matches,
+        journeys=[journey],
+    )
+
+    assert all(m.guideline.id != standalone_guideline.id for m in result.matches)
+    assert len(result.matches) == len(journey_guidelines)
+    assert len(result.journeys) == 1
+    assert result.journeys[0].id == journey.id

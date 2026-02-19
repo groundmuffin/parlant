@@ -5,6 +5,7 @@ All notable changes to Parlant will be documented here.
 ## [Unreleased]
 
 - Add staged_events to GuidelineMatchingContext in SDK
+- Add `priority` property to guidelines and journeys for priority-based filtering in the relational resolver
 
 ## [3.2.2] - 2025-02-18
 
