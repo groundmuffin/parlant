@@ -568,10 +568,10 @@ Please set OPENROUTER_API_KEY in your environment before running Parlant.
             "anthropic/claude-3.5-sonnet": lambda logger, tracer, meter: OpenRouterClaude35Sonnet[
                 t  # type: ignore
             ](logger, tracer, meter),
-            "meta-llama/llama-3.3-70b-instruct": lambda logger,
-            tracer,
-            meter: OpenRouterLlama33_70B[t](  # type: ignore
-                logger, tracer, meter
+            "meta-llama/llama-3.3-70b-instruct": lambda logger, tracer, meter: (
+                OpenRouterLlama33_70B[t](  # type: ignore
+                    logger, tracer, meter
+                )
             ),
         }
 
