@@ -39,7 +39,7 @@ def create_client(
         event_emitter_factory=container[EventEmitterFactory],
         logger=logger,
         tracer=tracer,
-        port=server._server.settings.port,
+        port=server._port,
     )
 
 
