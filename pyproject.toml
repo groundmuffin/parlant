@@ -22,14 +22,14 @@ dependencies = [
     "contextvars>=2.4",
     "croniter>=5.0.1",
     "fastapi>=0.120.0",
-    "fastmcp==2.13.0",
+    "fastmcp>=2.14.0",
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "jsonfinder>=0.4.2",
     "jsonschema>=4.23.0",
     "lagom>=2.6.0",
     "limits>=5.5.0",
-    "mcp>=1.16.0",
+    "mcp>=1.23.0",
     "more-itertools>=10.3.0",
     "nano-vectordb>=0.0.4.3",
     "nanoid>=2.0.0",
@@ -123,6 +123,11 @@ dev = [
     "types-python-dateutil>=2.8.19.20240106",
     "types-requests>=2.32.0.20240712",
     "pytest-xdist>=3.6.1",
+]
+
+[tool.uv]
+override-dependencies = [
+    "pyjwt>=2.10.1",  # Override zhipuai's pyjwt<2.9.0 cap to allow mcp>=1.23.0 (CVE-2025-66416)
 ]
 
 [build-system]
