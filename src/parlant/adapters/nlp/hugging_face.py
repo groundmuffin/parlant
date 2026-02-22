@@ -19,7 +19,7 @@ from typing import Any
 from typing_extensions import override
 import torch  # type: ignore
 from typing import cast
-from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer, PreTrainedModel  # type: ignore
+from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizerBase, PreTrainedModel  # type: ignore
 from huggingface_hub.errors import (  # type: ignore
     InferenceTimeoutError,
     InferenceEndpointError,
@@ -37,7 +37,7 @@ from parlant.core.nlp.tokenization import EstimatingTokenizer
 from parlant.core.nlp.embedding import BaseEmbedder, EmbeddingResult
 
 
-_TOKENIZER_MODELS: dict[str, PreTrainedTokenizer] = {}
+_TOKENIZER_MODELS: dict[str, PreTrainedTokenizerBase] = {}
 _AUTO_MODELS: dict[str, PreTrainedModel] = {}
 _DEVICE: torch.device | None = None
 
@@ -46,20 +46,21 @@ def _model_temp_dir() -> str:
     return str(Path(gettempdir()) / "parlant_data" / "hf_models")
 
 
-def _create_tokenizer(model_name: str) -> PreTrainedTokenizer:
+def _create_tokenizer(model_name: str) -> PreTrainedTokenizerBase:
     if model_name in _TOKENIZER_MODELS:
         return _TOKENIZER_MODELS[model_name]
 
     save_dir = os.environ.get("PARLANT_HOME", _model_temp_dir())
     os.makedirs(save_dir, exist_ok=True)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)  # type: ignore
-    tokenizer = cast(PreTrainedTokenizer, tokenizer)
+    tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
+        model_name, trust_remote_code=True
+    )  # type: ignore
     tokenizer.save_pretrained(save_dir)
 
     _TOKENIZER_MODELS[model_name] = tokenizer
 
-    return tokenizer  # type: ignore
+    return tokenizer
 
 
 def _get_device() -> torch.device:
