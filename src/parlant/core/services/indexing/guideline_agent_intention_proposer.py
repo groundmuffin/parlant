@@ -124,7 +124,7 @@ TASK DESCRIPTION
 -----------------
 Your task is to determine whether a guideline's condition MAY reflect your next intention. That is, whether it describes something which is not known at this point, but that you are likely to do next (e.g., "You are going to discuss a patient's medical record" or "You need to explain the terms and conditions"). Note: If the condition refers to something you have already done, or something that is already apparent given the context here, then it should not be considered a likely agent intention.
 
-Important: the important thing to test is whether the information required to ascern whether the guideline applies depends on previous messages, or on the message the agent is about to output. The guideline is considered 'agent intention' only if its the latter. 
+Important: Consider what information is needed to determine whether the condition applies. If it can be determined from previous messages alone, it is not an agent intention. It is only considered an agent intention if it depends on the content of the agent's upcoming reply.
 
 If the condition reflects likely agent intention, rephrase it to more clearly describe that you are LIKELY to do it next, using the following format:
 "You are likely to (do something)."
@@ -283,19 +283,6 @@ example_5_shot = AgentIntentionProposerShot(
     guideline=example_5_guideline,
     expected_result=AgentIntentionProposerSchema(
         condition=example_5_guideline.condition,
-        is_agent_intention=False,
-    ),
-)
-
-example_6_guideline = GuidelineContent(
-    condition="You are likely to encounter inappropriate language in the interaction history",
-    action="Ask the customer to be more respectful",
-)
-example_6_shot = AgentIntentionProposerShot(
-    description="",
-    guideline=example_6_guideline,
-    expected_result=AgentIntentionProposerSchema(
-        condition=example_6_guideline.condition,
         is_agent_intention=False,
     ),
 )
