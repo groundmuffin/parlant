@@ -428,6 +428,24 @@ async def test_that_actions_which_are_not_agent_intention_are_classified_correct
         await check_guideline(context=context, guideline=g, is_agent_intention=False)
 
 
+async def test_that_actions_using_the_word_likely_arent_falsely_detected_as_agent_intention(
+    context: ContextOfTest,
+) -> None:
+    guidelines = [
+        GuidelineContent(
+            condition="You are likely to encounter a very short and vague question from the customer, like 'credit cards' or 'dispute'",
+            action="refer the customer to our manual",
+        ),
+        GuidelineContent(
+            condition="The customer gives very short snappy responses like 'ok', 'sure', 'got it'",
+            action="Keep the next point brief, one sentence maximum",
+        ),
+    ]
+
+    for g in guidelines:
+        await check_guideline(context=context, guideline=g, is_agent_intention=False)
+
+
 def test_that_guideline_with_agent_intention_is_rewritten_and_matched(
     context: ContextOfTest,
     agent: Agent,
