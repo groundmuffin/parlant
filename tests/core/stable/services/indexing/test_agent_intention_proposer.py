@@ -422,6 +422,10 @@ async def test_that_actions_which_are_not_agent_intention_are_classified_correct
             condition="Customer indicated your behavior is likely to cause them harm",
             action="Apologize and ask about what worries the customer",
         ),
+        GuidelineContent(
+            condition="The customer gives very short snappy responses like 'ok', 'sure', 'got it'",
+            action="Keep the next point brief, one sentence maximum",
+        ),
     ]
 
     for g in guidelines:
@@ -435,10 +439,6 @@ async def test_that_actions_using_the_word_likely_arent_falsely_detected_as_agen
         GuidelineContent(
             condition="You are likely to encounter a very short and vague question from the customer, like 'credit cards' or 'dispute'",
             action="refer the customer to our manual",
-        ),
-        GuidelineContent(
-            condition="The customer gives very short snappy responses like 'ok', 'sure', 'got it'",
-            action="Keep the next point brief, one sentence maximum",
         ),
     ]
 
