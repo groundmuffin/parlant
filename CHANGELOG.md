@@ -13,6 +13,10 @@ All notable changes to Parlant will be documented here.
 
 - Upgrade MCP service and bump dependency versions to resolve security vulnerabilities
 
+### Deprecated
+
+- OpenAPI tool services are now deprecated; please migrate to SDK tool services
+
 ### Fixed
 
 - Fix guideline formatting in canned response and streaming modes when condition is absent

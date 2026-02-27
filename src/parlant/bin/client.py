@@ -946,6 +946,14 @@ class Actions:
             )
 
         elif kind == "openapi":
+            click.echo(
+                click.style(
+                    "Warning: OpenAPI tool services are deprecated and will be removed in a future version. "
+                    "Please migrate to SDK tool services.",
+                    fg="yellow",
+                ),
+                err=True,
+            )
             result = client.services.create_or_update(
                 name=name,
                 kind="openapi",
