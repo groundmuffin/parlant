@@ -4,8 +4,21 @@ All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
 
+### Added
+
 - Add staged_events to GuidelineMatchingContext in SDK
 - Add `priority` property to guidelines and journeys for priority-based filtering in the relational resolver
+
+### Changed
+
+- Upgrade MCP service and bump dependency versions to resolve security vulnerabilities
+
+### Fixed
+
+- Fix guideline formatting in canned response and streaming modes when condition is absent
+- Fix AzureService small text embedding dimension size
+- Fix onnxruntime compatibility with Python 3.10 and transformers 5.x type changes
+- Fix agent intention proposer prompt clarification
 
 ## [3.2.2] - 2025-02-18
 
