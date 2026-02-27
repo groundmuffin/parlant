@@ -162,8 +162,10 @@ class BaseEmbedder(Embedder):
         # Evict oldest entry if at capacity
         if len(self._cache) >= _EMBEDDING_CACHE_MAX_SIZE:
             oldest_checksum, oldest_entry = self._cache.popitem(last=False)
-            self._cache_length_index[oldest_entry.text_length].discard(oldest_checksum)
-            self._cache_length_index.pop(oldest_entry.text_length, None)
+            checksums = self._cache_length_index[oldest_entry.text_length]
+            checksums.discard(oldest_checksum)
+            if not checksums:
+                del self._cache_length_index[oldest_entry.text_length]
 
         # Add new entry
         self._cache[checksum] = _EmbeddingCacheEntry(

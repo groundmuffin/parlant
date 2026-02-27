@@ -23,6 +23,7 @@ All notable changes to Parlant will be documented here.
 - Fix AzureService small text embedding dimension size
 - Fix onnxruntime compatibility with Python 3.10 and transformers 5.x type changes
 - Fix agent intention proposer prompt clarification
+- Fix embedding LRU cache eviction corrupting the length index when entries share the same text length
 
 ## [3.2.2] - 2025-02-18
 
