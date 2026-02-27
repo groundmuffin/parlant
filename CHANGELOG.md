@@ -25,6 +25,10 @@ All notable changes to Parlant will be documented here.
 - Fix agent intention proposer prompt clarification
 - Fix embedding LRU cache eviction corrupting the length index when entries share the same text length
 
+### Removed
+
+- Remove stale `parlant-test` entry point and testing framework documentation from README
+
 ## [3.2.2] - 2025-02-18
 
 ### Added
