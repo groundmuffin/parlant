@@ -24,6 +24,7 @@ All notable changes to Parlant will be documented here.
 - Fix onnxruntime compatibility with Python 3.10 and transformers 5.x type changes
 - Fix agent intention proposer prompt clarification
 - Fix embedding LRU cache eviction corrupting the length index when entries share the same text length
+- Fix LiteLLMEmbedder failing to resolve via lagom container when LITELLM_EMBEDDING_MODEL_NAME is set
 
 ### Removed
 

@@ -249,6 +249,15 @@ class BaseEmbedder(Embedder):
 class EmbedderFactory:
     """Factory for creating embedder instances."""
 
+    # FIXME: The vector DB layer uses embedder_type.__name__ to name collections
+    # (e.g. "glossary_OpenAITextEmbedding3Large"). This works when each embedder
+    # class maps to a single model, but breaks for generic embedders like
+    # LiteLLMEmbedder where the model is configured via an env var. Changing
+    # LITELLM_EMBEDDING_MODEL_NAME between server restarts won't trigger
+    # re-indexing because the type name stays "LiteLLMEmbedder". The collection
+    # naming scheme needs to incorporate the model identity (e.g. embedder.id)
+    # rather than just the class name.
+
     def __init__(self, container: Container):
         self._container = container
 

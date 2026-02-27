@@ -392,13 +392,24 @@ def load_together(container: Container) -> NLPService:
 
 
 def load_litellm(container: Container) -> NLPService:
-    return load_nlp_service(
+    from parlant.adapters.nlp.litellm_service import LiteLLMService
+
+    service = load_nlp_service(
         container,
         "LiteLLM",
         "litellm",
         "LiteLLMService",
         "parlant.adapters.nlp.litellm_service",
     )
+
+    # LiteLLMEmbedder takes a model_name: str parameter that lagom cannot
+    # auto-resolve. We pre-register the embedder instance in the container
+    # so that EmbedderFactory.create_embedder() can resolve it.
+    assert isinstance(service, LiteLLMService)
+    embedder = service.create_embedder()
+    container[type(embedder)] = embedder
+
+    return service
 
 
 NLP_SERVICE_INITIALIZERS: dict[NLPServiceName, Callable[[Container], NLPService]] = {

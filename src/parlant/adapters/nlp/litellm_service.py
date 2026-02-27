@@ -322,8 +322,7 @@ Please set LITELLM_PROVIDER_MODEL_NAME in your environment before running Parlan
             self.logger, self._tracer, self._meter, self._base_url, self._model_name
         )
 
-    @override
-    async def get_embedder(self, hints: EmbedderHints = {}) -> Embedder:
+    def create_embedder(self) -> Embedder:
         if self._embedding_model_name:
             return LiteLLMEmbedder(
                 model_name=self._embedding_model_name,
@@ -333,6 +332,10 @@ Please set LITELLM_PROVIDER_MODEL_NAME in your environment before running Parlan
                 base_url=self._base_url,
             )
         return JinaAIEmbedder(self.logger, self._tracer, self._meter)
+
+    @override
+    async def get_embedder(self, hints: EmbedderHints = {}) -> Embedder:
+        return self.create_embedder()
 
     @override
     async def get_moderation_service(self) -> ModerationService:

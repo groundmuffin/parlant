@@ -378,7 +378,15 @@ class NLPServices:
         if error := LiteLLMService.verify_environment():
             raise NLPServiceConfigurationError(error)
 
-        return LiteLLMService(container[Logger], container[Tracer], container[Meter])
+        service = LiteLLMService(container[Logger], container[Tracer], container[Meter])
+
+        # LiteLLMEmbedder takes a model_name: str parameter that lagom cannot
+        # auto-resolve. We pre-register the embedder instance in the container
+        # so that EmbedderFactory.create_embedder() can resolve it.
+        embedder = service.create_embedder()
+        container[type(embedder)] = embedder
+
+        return service
 
     @staticmethod
     def modelscope(container: Container) -> NLPService:
