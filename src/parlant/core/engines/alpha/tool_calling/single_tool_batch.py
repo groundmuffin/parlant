@@ -1261,6 +1261,12 @@ OUTPUT FORMAT:
         list[MissingToolData],
         list[InvalidToolData],
     ]:
+        MISSING_VALUE = "<<__missing__>>"
+        MISSING_ARRAY_VALUE = "['<<__missing__>>']"
+
+        def is_missing_value(value: str | None) -> bool:
+            return value == MISSING_VALUE or value == MISSING_ARRAY_VALUE
+
         tool_id, tool, _ = candidate_descriptor
         tool_calls: list[ToolCall] = []
         evaluations: list[tuple[ToolId, ToolCallEvaluation]] = []
@@ -1279,10 +1285,18 @@ OUTPUT FORMAT:
                 missing_required = [r for r in tool.required if r not in arguments] + [
                     name
                     for name, value in arguments.items()
-                    if value == "<<__missing__>>" or value == "['<<__missing__>>']"
+                    if name in tool.required and is_missing_value(value)
                 ]
 
                 if not missing_required:
+                    # Set optional params that are absent or missing to None
+                    for param_name in tool.parameters:
+                        if param_name not in tool.required:
+                            if param_name not in arguments or is_missing_value(
+                                arguments[param_name]
+                            ):
+                                arguments[param_name] = None
+
                     tool_calls.append(
                         ToolCall(
                             id=ToolCallId(generate_id()),
