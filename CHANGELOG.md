@@ -19,6 +19,7 @@ All notable changes to Parlant will be documented here.
 
 ### Fixed
 
+- Fix response analysis logs not always reaching the integrated UI
 - Fix guideline formatting in canned response and streaming modes when condition is absent
 - Fix AzureService small text embedding dimension size
 - Fix onnxruntime compatibility with Python 3.10 and transformers 5.x type changes
