@@ -156,6 +156,20 @@ class SessionModule:
             timeout=timeout,
         )
 
+    async def wait_for_new_streaming_chunks(
+        self,
+        session_id: SessionId,
+        event_id: EventId,
+        last_known_chunk_count: int,
+        timeout: Timeout = Timeout.infinite(),
+    ) -> bool:
+        return await self._session_listener.wait_for_new_streaming_chunks(
+            session_id=session_id,
+            event_id=event_id,
+            last_known_chunk_count=last_known_chunk_count,
+            timeout=timeout,
+        )
+
     async def create(
         self,
         customer_id: CustomerId,

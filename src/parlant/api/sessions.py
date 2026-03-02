@@ -2117,6 +2117,7 @@ def create_router(
         if sse:
             # Return SSE stream that sends event updates until completion
             async def event_stream() -> AsyncIterator[str]:
+                chunk_count = 0
                 while True:
                     event = await app.sessions.read_event(
                         session_id=session_id,
@@ -2129,16 +2130,18 @@ def create_router(
                     data = cast(dict[str, object], event.data)
                     if "chunks" in data:
                         chunks = cast(list[str | None], data["chunks"])
+                        chunk_count = len(chunks)
                         if chunks and chunks[-1] is None:
                             break
                     else:
                         # Non-streaming event, just return it once
                         break
 
-                    # Wait for event to update
-                    if not await app.sessions.wait_for_event_completion(
+                    # Wait for new chunks (not full completion)
+                    if not await app.sessions.wait_for_new_streaming_chunks(
                         session_id=session_id,
                         event_id=event_id,
+                        last_known_chunk_count=chunk_count,
                         timeout=Timeout(wait_for_data),
                     ):
                         break

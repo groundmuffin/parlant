@@ -1441,6 +1441,21 @@ class SessionListener(ABC):
         """
         ...
 
+    @abstractmethod
+    async def wait_for_new_streaming_chunks(
+        self,
+        session_id: SessionId,
+        event_id: EventId,
+        last_known_chunk_count: int,
+        timeout: Timeout = Timeout.infinite(),
+    ) -> bool:
+        """Wait for new streaming chunks to arrive or for the event to complete.
+
+        Returns True when len(chunks) > last_known_chunk_count or event is complete.
+        Returns False on timeout.
+        """
+        ...
+
 
 class PollingSessionListener(SessionListener):
     def __init__(self, session_store: SessionStore) -> None:
@@ -1497,6 +1512,35 @@ class PollingSessionListener(SessionListener):
                     return True
             else:
                 # Non-streaming event, return immediately
+                return True
+
+            if timeout.expired():
+                return False
+            else:
+                await timeout.wait_up_to(0.1)
+
+    @override
+    async def wait_for_new_streaming_chunks(
+        self,
+        session_id: SessionId,
+        event_id: EventId,
+        last_known_chunk_count: int,
+        timeout: Timeout = Timeout.infinite(),
+    ) -> bool:
+        # Trigger exception if not found
+        _ = await self._session_store.read_session(session_id)
+
+        while True:
+            event = await self._session_store.read_event(session_id, event_id)
+
+            data = cast(dict[str, object], event.data)
+            if "chunks" in data:
+                chunks = cast(list[str | None], data["chunks"])
+                if len(chunks) > last_known_chunk_count:
+                    return True
+                if chunks and chunks[-1] is None:
+                    return True
+            else:
                 return True
 
             if timeout.expired():

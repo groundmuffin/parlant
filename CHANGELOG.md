@@ -20,6 +20,7 @@ All notable changes to Parlant will be documented here.
 
 ### Fixed
 
+- Fix SSE `read_event` endpoint stalling after first streaming chunk until full completion
 - Fix response analysis logs not always reaching the integrated UI
 - Fix guideline formatting in canned response and streaming modes when condition is absent
 - Fix AzureService small text embedding dimension size
