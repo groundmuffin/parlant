@@ -9,6 +9,7 @@ All notable changes to Parlant will be documented here.
 - Add staged_events to GuidelineMatchingContext in SDK
 - Add `priority` property to guidelines and journeys for priority-based filtering in the relational resolver
 - Add tool-provided guidelines, allowing tools to dynamically inject behavioral guidelines into the agent's context
+- Add `Customer.update()` and `CustomerMetadata` to the SDK, allowing tools to update customer name and metadata
 
 ### Changed
 

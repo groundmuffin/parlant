@@ -116,7 +116,7 @@ class CustomerStore(ABC):
     ) -> None: ...
 
     @abstractmethod
-    async def add_extra(
+    async def upsert_extra(
         self,
         customer_id: CustomerId,
         extra: Mapping[str, str],
@@ -493,7 +493,7 @@ class CustomerDocumentStore(CustomerStore):
         return None
 
     @override
-    async def add_extra(
+    async def upsert_extra(
         self,
         customer_id: CustomerId,
         extra: Mapping[str, str],

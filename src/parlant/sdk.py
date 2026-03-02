@@ -50,6 +50,7 @@ from typing import (
     Coroutine,
     Generic,
     Iterable,
+    Iterator,
     Literal,
     Mapping,
     NoReturn,
@@ -2706,9 +2707,102 @@ class Variable:
         return value.data if value else None
 
 
-@dataclass(frozen=True)
+class CustomerMetadata:
+    """Async-aware metadata accessor for a customer.
+
+    Supports sync reads via ``[]`` and async writes via :meth:`set` / :meth:`delete`.
+    Use :meth:`get` for an async read that refreshes from the store.
+    """
+
+    def __init__(
+        self,
+        customer_id: CustomerId,
+        data: Mapping[str, str],
+        server: Optional[Server] = None,
+    ) -> None:
+        self._customer_id = customer_id
+        self._data = dict(data)
+        self._server = server
+
+    def _get_store(self) -> CustomerStore:
+        server = self._server if self._server is not None else Server.current
+        return server._container[CustomerStore]
+
+    # -- sync reads ----------------------------------------------------------
+
+    def __getitem__(self, key: str) -> str:
+        return self._data[key]
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._data
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    # -- async operations -----------------------------------------------------
+
+    async def get(self, key: str, default: str | None = None) -> str | None:
+        """Read a metadata value, refreshing from the store first."""
+        customer = await self._get_store().read_customer(self._customer_id)
+        self._data = dict(customer.extra)
+        return self._data.get(key, default)
+
+    def _check_not_guest(self) -> None:
+        if self._customer_id == CustomerStore.GUEST_ID:
+            raise RuntimeError("Cannot update the guest customer")
+
+    async def set(self, key: str, value: str) -> None:
+        """Set a metadata value and persist it to the store."""
+        self._check_not_guest()
+        await self._get_store().upsert_extra(self._customer_id, {key: value})
+        self._data[key] = value
+
+    async def delete(self, key: str) -> None:
+        """Delete a metadata value and persist the removal to the store."""
+        self._check_not_guest()
+        await self._get_store().remove_extra(self._customer_id, [key])
+        del self._data[key]
+
+
 class Customer:
     """A customer represents an individual or entity interacting with the agent."""
+
+    def __init__(
+        self,
+        id: CustomerId,
+        name: str,
+        metadata: Mapping[str, str],
+        tags: Sequence[TagId],
+        _server: Optional[Server] = None,
+    ) -> None:
+        self._id = id
+        self._name = name
+        self._metadata = CustomerMetadata(
+            customer_id=id,
+            data=metadata,
+            server=_server,
+        )
+        self._tags = tags
+        self._server = _server
+
+    @property
+    def id(self) -> CustomerId:
+        return self._id
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def metadata(self) -> CustomerMetadata:
+        return self._metadata
+
+    @property
+    def tags(self) -> Sequence[TagId]:
+        return self._tags
 
     @classproperty
     def guest(cls: Customer) -> Customer:
@@ -2718,11 +2812,6 @@ class Customer:
             metadata={},
             tags=[],
         )
-
-    id: CustomerId
-    name: str
-    metadata: Mapping[str, str]
-    tags: Sequence[TagId]
 
     @classproperty
     def current(cls) -> Customer:
@@ -2744,6 +2833,35 @@ class Customer:
             metadata=core_customer.extra,
             tags=core_customer.tags,
         )
+
+    async def update(
+        self,
+        *,
+        name: str | None = None,
+    ) -> None:
+        """Updates the customer's information.
+
+        Args:
+            name: New name for the customer.
+
+        Raises:
+            RuntimeError: If this is the guest customer.
+        """
+        if self._id == CustomerStore.GUEST_ID:
+            raise RuntimeError("Cannot update the guest customer")
+
+        server = self._server if self._server is not None else Server.current
+        customer_store = server._container[CustomerStore]
+
+        if name is not None:
+            await customer_store.update_customer(
+                customer_id=self._id,
+                params={"name": name},
+            )
+
+        updated = await customer_store.read_customer(self._id)
+        self._name = updated.name
+        self._tags = updated.tags
 
 
 @dataclass(frozen=True)
@@ -4397,6 +4515,7 @@ class Server:
             name=customer.name,
             metadata=customer.extra,
             tags=customer.tags,
+            _server=self,
         )
 
     async def list_customers(self) -> Sequence[Customer]:
@@ -4871,6 +4990,7 @@ __all__ = [
     "ControlOptions",
     "Criticality",
     "Customer",
+    "CustomerMetadata",
     "CustomerId",
     "CustomerModerationContext",
     "CustomerStore",

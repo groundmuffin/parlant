@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from parlant.core.customers import CustomerStore
 from parlant.core.tools import ToolContext, ToolResult
 import parlant.sdk as p
 
@@ -151,4 +152,43 @@ class Test_that_tool_guideline_priority_filters_lower_priority_guidelines(SDKTes
         )
         assert "orange" not in response.lower(), (
             f"Expected 'orange' to be filtered out by priority but got: {response}"
+        )
+
+
+class Test_that_a_tool_can_update_customer_metadata(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tool Test Agent",
+            description="Agent for testing customer metadata update",
+        )
+
+        self.customer = await server.create_customer(name="Test Customer")
+
+        self.update_succeeded = False
+
+        @p.tool
+        async def update_customer_tool(context: ToolContext) -> ToolResult:
+            await p.Customer.current.metadata.set("vip", "true")
+            self.update_succeeded = True
+            return ToolResult(data={"status": "updated"})
+
+        await self.agent.attach_tool(
+            tool=update_customer_tool,
+            condition="the user asks to update their profile",
+        )
+
+    async def run(self, ctx: Context) -> None:
+        await ctx.send_and_receive_message(
+            customer_message="Please update my profile",
+            recipient=self.agent,
+            sender=self.customer,
+        )
+
+        assert self.update_succeeded, "Expected tool to be called but it was not"
+
+        customer_store = ctx.container[CustomerStore]
+        updated_customer = await customer_store.read_customer(self.customer.id)
+
+        assert updated_customer.extra.get("vip") == "true", (
+            f"Expected customer metadata to contain vip=true, got: {updated_customer.extra}"
         )
