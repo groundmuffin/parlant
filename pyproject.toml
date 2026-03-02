@@ -13,7 +13,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "aiopenapi3==0.9.0",
     "aiorwlock>=1.5.0",
-    "authlib>=1.6.5",
+    "authlib>1.6.5",
     "boto3>=1.35.70",
     "cachetools>=6.0.0",
     "click>=8.1.7",
@@ -128,6 +128,21 @@ dev = [
 override-dependencies = [
     "pyjwt>=2.10.1",  # Override zhipuai's pyjwt<2.9.0 cap to allow mcp>=1.23.0 (CVE-2025-66416)
     "onnxruntime<1.24; python_full_version < '3.11'",  # 1.24+ dropped Python 3.10 support
+]
+constraint-dependencies = [
+    # Minimum safe versions for transitive dependencies with known CVEs.
+    # These constraints only affect resolution — they do not force installation.
+    "aiohttp>=3.13.3",
+    "azure-core>=1.38.0",
+    "cryptography>=46.0.5",
+    "filelock>=3.20.3",
+    "fonttools>=4.60.2",
+    "orjson>=3.11.5",
+    "pillow>=12.1.1",
+    "protobuf>=6.33.5",
+    "pyasn1>=0.6.2",
+    "python-multipart>=0.0.22",
+    "urllib3>=2.6.3",
 ]
 
 [build-system]
