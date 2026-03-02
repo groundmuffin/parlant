@@ -41,6 +41,8 @@
 
 &nbsp;
 
+Parlant streamlines conversational context engineering for enterprise-grade business-to-consumer (B2C) interactions that need to be consistent, compliant, and on-brand.
+
 <img alt="Parlant Demo" src="https://github.com/emcie-co/parlant/blob/develop/docs/demo.gif?raw=true" width="100%" />
 
 ## Getting started
@@ -86,8 +88,6 @@ async with p.Server():
 Follow the **[5-minute quickstart](https://www.parlant.io/docs/quickstart/installation)** for a full walkthrough.
 
 ## Parlant at a glance
-
-Parlant simplifies conversational context engineering for enterprise-grade business-to-consumer (B2C) interactions.
 
 You define your agent's behavior in code (not prompts), and the engine dynamically narrows the context on each turn to only what's immediately relevant, so the LLM stays focused and your agent stays aligned.
 
