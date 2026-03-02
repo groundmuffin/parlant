@@ -697,6 +697,7 @@ class PluginServer:
                                     control=result.control,
                                     canned_responses=result.canned_responses,
                                     canned_response_fields=result.canned_response_fields,
+                                    guidelines=result.guidelines,
                                 )
                             ).model_dump_json()
 

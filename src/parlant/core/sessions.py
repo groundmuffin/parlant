@@ -30,7 +30,7 @@ from typing import (
     TypeAlias,
     cast,
 )
-from typing_extensions import override, TypedDict, NotRequired, Self
+from typing_extensions import override, TypedDict, NotRequired, Required, Self
 
 from parlant.core import async_utils
 from parlant.core.async_utils import ReaderWriterLock, Timeout
@@ -163,12 +163,21 @@ class ControlOptions(TypedDict, total=False):
     lifespan: LifeSpan
 
 
+class ToolProvidedGuideline(TypedDict, total=False):
+    action: Required[str]
+    condition: str
+    priority: int
+    criticality: str
+    description: str
+
+
 class ToolResult(TypedDict):
     data: JSONSerializable
     metadata: Mapping[str, JSONSerializable]
     control: ControlOptions
     canned_responses: Sequence[str]
     canned_response_fields: Mapping[str, JSONSerializable]
+    guidelines: NotRequired[Sequence[ToolProvidedGuideline]]
 
 
 class ToolCall(TypedDict):

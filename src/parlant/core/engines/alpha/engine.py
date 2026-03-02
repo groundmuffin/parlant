@@ -74,6 +74,7 @@ from parlant.core.sessions import (
     EventKind,
     Session,
     ToolEventData,
+    ToolProvidedGuideline,
 )
 from parlant.core.engines.alpha.guideline_matching.guideline_matcher import (
     GuidelineMatcher,
@@ -301,16 +302,11 @@ class AlphaEngine(Engine):
                 if not await self._hooks.call_on_preparation_iteration_end(context):
                     break
 
-            # Filter missing and invalid tool parameters jointly
-            problematic_data = await self._filter_problematic_tool_parameters_based_on_precedence(
-                list(context.state.tool_insights.missing_data)
-                + list(context.state.tool_insights.invalid_data)
-            )
-            context.state.tool_insights = ToolInsights(
-                evaluations=context.state.tool_insights.evaluations,
-                missing_data=[p for p in problematic_data if isinstance(p, MissingToolData)],
-                invalid_data=[p for p in problematic_data if isinstance(p, InvalidToolData)],
-            )
+            # Inject tool-returned guidelines and re-apply priority filtering.
+            self._inject_transient_guidelines(context)
+
+            # Filter problematic tool parameters by precedence.
+            await self._inject_tool_insights(context)
 
             async def uncancellable_section(
                 latch: async_utils.CancellationSuppressionLatch[None],
@@ -1872,6 +1868,86 @@ class AlphaEngine(Engine):
         return [
             utterance_request_to_match(i, request) for i, request in enumerate(requests, start=1)
         ]
+
+    def _inject_transient_guidelines(self, context: EngineContext) -> None:
+        """Extract virtual guidelines from tool results, inject them as ordinary
+        guideline matches, and re-apply priority filtering on the combined set."""
+        tool_guideline_matches = self._extract_guidelines_from_tool_results(
+            context.state.tool_events
+        )
+        context.state.ordinary_guideline_matches.extend(tool_guideline_matches)
+
+        # Re-apply priority filtering now that tool guidelines (which may carry
+        # their own priority) have been injected into the combined match set.
+        if tool_guideline_matches:
+            deactivation_reasons: dict[GuidelineId, str] = {}
+            filtered_matches, filtered_journeys = (
+                self._relational_resolver.find_highest_priority_entities(
+                    context.state.ordinary_guideline_matches,
+                    context.state.journeys,
+                    deactivation_reasons,
+                )
+            )
+            context.state.ordinary_guideline_matches = filtered_matches
+            context.state.journeys = filtered_journeys
+
+    async def _inject_tool_insights(self, context: EngineContext) -> None:
+        """Filter missing and invalid tool parameters jointly by precedence."""
+        problematic_data = await self._filter_problematic_tool_parameters_based_on_precedence(
+            list(context.state.tool_insights.missing_data)
+            + list(context.state.tool_insights.invalid_data)
+        )
+        context.state.tool_insights = ToolInsights(
+            evaluations=context.state.tool_insights.evaluations,
+            missing_data=[p for p in problematic_data if isinstance(p, MissingToolData)],
+            invalid_data=[p for p in problematic_data if isinstance(p, InvalidToolData)],
+        )
+
+    def _extract_guidelines_from_tool_results(
+        self,
+        tool_events: Sequence[EmittedEvent],
+    ) -> Sequence[GuidelineMatch]:
+        """Extract virtual guidelines from tool results and convert them to GuidelineMatch objects.
+
+        This follows the same pattern as _utterance_requests_to_guideline_matches:
+        synthetic Guideline instances with fake IDs, injected into ordinary_guideline_matches.
+        """
+        matches: list[GuidelineMatch] = []
+        guideline_index = 0
+
+        for tool_event in tool_events:
+            tool_calls = cast(ToolEventData, tool_event.data)["tool_calls"]
+            for tool_call in tool_calls:
+                tool_id = tool_call["tool_id"]
+                guidelines: Sequence[ToolProvidedGuideline] = tool_call["result"].get(
+                    "guidelines", []
+                )
+                for guideline_data in guidelines:
+                    guideline_index += 1
+                    matches.append(
+                        GuidelineMatch(
+                            guideline=Guideline(
+                                id=GuidelineId(f"<tool-guideline-{guideline_index}>"),
+                                creation_utc=datetime.now(timezone.utc),
+                                content=GuidelineContent(
+                                    condition=guideline_data.get("condition", ""),
+                                    action=guideline_data["action"],
+                                    description=guideline_data.get("description"),
+                                ),
+                                criticality=Criticality(guideline_data["criticality"])
+                                if "criticality" in guideline_data
+                                else Criticality.MEDIUM,
+                                enabled=True,
+                                tags=[],
+                                metadata={},
+                                priority=guideline_data.get("priority", 0),
+                            ),
+                            rationale=f"Returned by tool '{tool_id}'",
+                            score=10,
+                        )
+                    )
+
+        return matches
 
     async def _load_context_variable_value(
         self,

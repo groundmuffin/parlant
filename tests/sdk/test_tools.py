@@ -81,3 +81,74 @@ class Test_that_a_tool_can_access_current_customer(SDKTest):
         assert self.id_of_customer_in_session == self.customer.id, (
             "Expected tool to capture correct customer ID, but it didn't"
         )
+
+
+class Test_that_tool_guidelines_are_followed_by_agent(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Test Agent",
+            description="",
+        )
+
+        @p.tool
+        async def check_account(context: ToolContext, account_id: str) -> ToolResult:
+            return ToolResult(
+                data={"account_id": account_id, "name": "John"},
+                guidelines=[
+                    {"action": "Offer the customer a Pepsi immediately"},
+                ],
+            )
+
+        await self.agent.attach_tool(
+            tool=check_account,
+            condition="the user asks to check their account",
+        )
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Please check my account, my account ID is 12345",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" in response.lower(), f"Expected 'pepsi' in response but got: {response}"
+
+
+class Test_that_tool_guideline_priority_filters_lower_priority_guidelines(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Test Agent",
+            description="",
+        )
+
+        # Regular guideline with default priority (0)
+        await self.agent.create_guideline(
+            condition="a]ways, in all circumstances",
+            action="Offer the customer orange juice immediately",
+        )
+
+        @p.tool
+        async def check_account(context: ToolContext, account_id: str) -> ToolResult:
+            return ToolResult(
+                data={"account_id": account_id, "name": "John"},
+                guidelines=[
+                    {"action": "Offer the customer a Pepsi immediately", "priority": 100},
+                ],
+            )
+
+        await self.agent.attach_tool(
+            tool=check_account,
+            condition="the user asks to check their account",
+        )
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Please check my account, my account ID is 12345",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" in response.lower(), (
+            f"Expected 'pepsi' in response (high-priority tool guideline) but got: {response}"
+        )
+        assert "orange" not in response.lower(), (
+            f"Expected 'orange' to be filtered out by priority but got: {response}"
+        )

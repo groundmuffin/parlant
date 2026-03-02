@@ -161,7 +161,7 @@ class RelationalResolver:
                 # Step 4: Apply priority filtering
                 # After all relational resolution has converged, filter to keep
                 # only entities sharing the highest priority value.
-                current_matches, current_journeys = self._apply_priority_filtering(
+                current_matches, current_journeys = self.find_highest_priority_entities(
                     current_matches,
                     current_journeys,
                     deactivation_reasons,
@@ -510,7 +510,7 @@ class RelationalResolver:
 
         return RelationalResolverResult(matches=final_result, journeys=filtered_journeys)
 
-    def _apply_priority_filtering(
+    def find_highest_priority_entities(
         self,
         matches: Sequence[GuidelineMatch],
         journeys: Sequence[Journey],
