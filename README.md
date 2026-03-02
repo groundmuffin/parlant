@@ -41,7 +41,7 @@
 
 &nbsp;
 
-Parlant streamlines conversational context engineering for enterprise-grade business-to-consumer (B2C) interactions that need to be consistent, compliant, and on-brand.
+**Parlant streamlines conversational context engineering for enterprise-grade business-to-consumer (B2C) interactions that need to be consistent, compliant, and on-brand.**
 
 <img alt="Parlant Demo" src="https://github.com/emcie-co/parlant/blob/develop/docs/demo.gif?raw=true" width="100%" />
 
