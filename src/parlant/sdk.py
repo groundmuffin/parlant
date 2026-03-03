@@ -180,6 +180,7 @@ from parlant.core.sessions import (
     SessionId,
     SessionDocumentStore,
     SessionStore,
+    SessionUpdateParams as _SessionUpdateParams,
     StatusEventData,
     ToolCall as _SessionToolCall,
     ToolEventData,
@@ -880,6 +881,10 @@ class GuidelineMatchingContext:
                 interaction=interaction,
                 metadata=core_ctx.session.metadata,
                 labels=core_ctx.session.labels,
+                customer=customer,
+                agent=agent,
+                mode=core_ctx.session.mode,
+                title=core_ctx.session.title,
             ),
             agent=agent,
             customer=customer,
@@ -3396,21 +3401,170 @@ class Agent:
         )
 
 
-@dataclass(frozen=True)
+class SessionMetadata:
+    """Async-aware metadata accessor for a session.
+
+    Supports sync reads via ``[]`` and async writes via :meth:`set` / :meth:`delete`.
+    Use :meth:`get` for an async read that refreshes from the store.
+    """
+
+    def __init__(
+        self,
+        session_id: SessionId,
+        data: Mapping[str, JSONSerializable],
+        server: Optional[Server] = None,
+    ) -> None:
+        self._session_id = session_id
+        self._data = dict(data)
+        self._server = server
+
+    def _get_store(self) -> SessionStore:
+        server = self._server if self._server is not None else Server.current
+        return server._container[SessionStore]
+
+    # -- sync reads ----------------------------------------------------------
+
+    def __getitem__(self, key: str) -> JSONSerializable:
+        return self._data[key]
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._data
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    # -- async operations -----------------------------------------------------
+
+    async def get(self, key: str, default: JSONSerializable = None) -> JSONSerializable:
+        """Read a metadata value, refreshing from the store first."""
+        session = await self._get_store().read_session(self._session_id)
+        self._data = dict(session.metadata)
+        return self._data.get(key, default)
+
+    async def set(self, key: str, value: JSONSerializable) -> None:
+        """Set a metadata value and persist it to the store."""
+        await self._get_store().set_metadata(self._session_id, key, value)
+        self._data[key] = value
+
+    async def delete(self, key: str) -> None:
+        """Delete a metadata value and persist the removal to the store."""
+        await self._get_store().unset_metadata(self._session_id, key)
+        del self._data[key]
+
+
+class SessionLabels:
+    """Async-aware labels accessor for a session.
+
+    Supports sync reads via ``in`` and ``len`` and async writes via :meth:`add` / :meth:`remove`.
+    """
+
+    def __init__(
+        self,
+        session_id: SessionId,
+        data: Set[str],
+        server: Optional[Server] = None,
+    ) -> None:
+        self._session_id = session_id
+        self._data = set(data)
+        self._server = server
+
+    def _get_store(self) -> SessionStore:
+        server = self._server if self._server is not None else Server.current
+        return server._container[SessionStore]
+
+    # -- sync reads ----------------------------------------------------------
+
+    def __contains__(self, label: object) -> bool:
+        return label in self._data
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    # -- async operations -----------------------------------------------------
+
+    async def add(self, label: str) -> None:
+        """Add a label and persist it to the store."""
+        await self._get_store().upsert_labels(self._session_id, {label})
+        self._data.add(label)
+
+    async def remove(self, label: str) -> None:
+        """Remove a label and persist the removal to the store."""
+        await self._get_store().remove_labels(self._session_id, {label})
+        self._data.discard(label)
+
+
 class Session:
     """A session represents an ongoing conversation between a customer and an agent."""
 
-    id: SessionId
-    """The unique identifier of the session."""
+    def __init__(
+        self,
+        id: SessionId,
+        interaction: Interaction,
+        metadata: Mapping[str, JSONSerializable],
+        labels: Set[str],
+        customer: Customer,
+        agent: Agent,
+        mode: SessionMode,
+        title: str | None = None,
+        _server: Optional[Server] = None,
+    ) -> None:
+        self._id = id
+        self._interaction = interaction
+        self._metadata = SessionMetadata(
+            session_id=id,
+            data=metadata,
+            server=_server,
+        )
+        self._labels = SessionLabels(
+            session_id=id,
+            data=labels,
+            server=_server,
+        )
+        self._customer = customer
+        self._agent = agent
+        self._mode = mode
+        self._title = title
+        self._server = _server
 
-    interaction: Interaction
-    """The interaction history of this session."""
+    @property
+    def id(self) -> SessionId:
+        return self._id
 
-    metadata: Mapping[str, JSONSerializable]
-    """Additional metadata associated with the session."""
+    @property
+    def interaction(self) -> Interaction:
+        return self._interaction
 
-    labels: Set[str]
-    """Associated labels that can be used for categorization and filtering."""
+    @property
+    def metadata(self) -> SessionMetadata:
+        return self._metadata
+
+    @property
+    def labels(self) -> SessionLabels:
+        return self._labels
+
+    @property
+    def customer(self) -> Customer:
+        """The customer associated with this session."""
+        return self._customer
+
+    @property
+    def agent(self) -> Agent:
+        """The agent associated with this session."""
+        return self._agent
+
+    @property
+    def mode(self) -> SessionMode:
+        return self._mode
+
+    @property
+    def title(self) -> str | None:
+        return self._title
 
     @classproperty
     def current(cls) -> Session:
@@ -3437,7 +3591,54 @@ class Session:
             interaction=interaction,
             metadata=core_session.metadata,
             labels=core_session.labels,
+            customer=Customer.current,
+            agent=Agent.current,
+            mode=core_session.mode,
+            title=core_session.title,
         )
+
+    async def update(
+        self,
+        *,
+        customer: Customer | None = None,
+        agent: Agent | None = None,
+        mode: SessionMode | None = None,
+        title: str | None = None,
+    ) -> None:
+        """Updates the session's information.
+
+        Args:
+            customer: New customer for the session.
+            agent: New agent for the session.
+            mode: New session mode ("auto" or "manual").
+            title: New title for the session.
+        """
+        server = self._server if self._server is not None else Server.current
+        session_store = server._container[SessionStore]
+
+        params: _SessionUpdateParams = {}
+        if customer is not None:
+            params["customer_id"] = customer.id
+        if agent is not None:
+            params["agent_id"] = agent.id
+        if mode is not None:
+            params["mode"] = mode
+        if title is not None:
+            params["title"] = title
+
+        if params:
+            await session_store.update_session(
+                session_id=self._id,
+                params=params,
+            )
+
+        updated = await session_store.read_session(self._id)
+        self._mode = updated.mode
+        self._title = updated.title
+        if customer is not None:
+            self._customer = customer
+        if agent is not None:
+            self._agent = agent
 
 
 class ToolContextAccessor:
@@ -3961,6 +4162,10 @@ class Server:
                     interaction=ctx.interaction,
                     metadata=ctx.session.metadata,
                     labels=ctx.session.labels,
+                    customer=customer,
+                    agent=agent,
+                    mode=ctx.session.mode,
+                    title=ctx.session.title,
                 ),
                 agent=agent,
                 customer=customer,
@@ -4242,6 +4447,10 @@ class Server:
                             interaction=ctx.interaction,
                             metadata=ctx.session.metadata,
                             labels=ctx.session.labels,
+                            customer=customer,
+                            agent=agent,
+                            mode=ctx.session.mode,
+                            title=ctx.session.title,
                         ),
                         agent=agent,
                         customer=customer,
@@ -5069,6 +5278,8 @@ __all__ = [
     "ServiceRegistry",
     "Session",
     "SessionId",
+    "SessionLabels",
+    "SessionMetadata",
     "SessionMode",
     "SessionStatus",
     "SessionStore",

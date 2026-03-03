@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from parlant.core.customers import CustomerStore
+from parlant.core.sessions import SessionStore
 from parlant.core.tools import ToolContext, ToolResult
 import parlant.sdk as p
 
@@ -191,4 +192,44 @@ class Test_that_a_tool_can_update_customer_metadata(SDKTest):
 
         assert updated_customer.extra.get("vip") == "true", (
             f"Expected customer metadata to contain vip=true, got: {updated_customer.extra}"
+        )
+
+
+class Test_that_a_tool_can_update_session_metadata(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tool Test Agent",
+            description="Agent for testing session metadata update",
+        )
+
+        self.customer = await server.create_customer(name="Test Customer")
+
+        self.update_succeeded = False
+
+        @p.tool
+        async def update_session_tool(context: ToolContext) -> ToolResult:
+            await p.Session.current.metadata.set("priority", "high")
+            self.update_succeeded = True
+            return ToolResult(data={"status": "updated"})
+
+        await self.agent.attach_tool(
+            tool=update_session_tool,
+            condition="the user asks to update their session",
+        )
+
+    async def run(self, ctx: Context) -> None:
+        await ctx.send_and_receive_message(
+            customer_message="Please update my session",
+            recipient=self.agent,
+            sender=self.customer,
+        )
+
+        assert self.update_succeeded, "Expected tool to be called but it was not"
+
+        session = await ctx.get_session()
+        session_store = ctx.container[SessionStore]
+        updated_session = await session_store.read_session(session.id)
+
+        assert updated_session.metadata.get("priority") == "high", (
+            f"Expected session metadata to contain priority=high, got: {updated_session.metadata}"
         )

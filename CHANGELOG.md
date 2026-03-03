@@ -10,6 +10,8 @@ All notable changes to Parlant will be documented here.
 - Add `priority` property to guidelines and journeys for priority-based filtering in the relational resolver
 - Add tool-provided guidelines, allowing tools to dynamically inject behavioral guidelines into the agent's context
 - Add `Customer.update()` and `CustomerMetadata` to the SDK, allowing tools to update customer name and metadata
+- Add `Session.update()`, `SessionMetadata`, and `SessionLabels` to the SDK, allowing tools to update session properties, metadata, and labels
+- Add `customer`, `agent`, `mode`, and `title` properties to SDK `Session` class
 
 ### Changed
 
