@@ -8,13 +8,15 @@ All notable changes to Parlant will be documented here.
 
 - Add staged_events to GuidelineMatchingContext in SDK
 - Add `priority` property to guidelines and journeys for priority-based filtering in the relational resolver
-- Add tool-provided guidelines, allowing tools to dynamically inject behavioral guidelines into the agent's context
+- Add transient guidelines (renamed from tool-provided guidelines), allowing tools to dynamically inject behavioral guidelines into the agent's context
+- Add `Agent.utter()` to the SDK, enabling programmatic agent message generation with transient guidelines
 - Add `Customer.update()` and `CustomerMetadata` to the SDK, allowing tools to update customer name and metadata
 - Add `Session.update()`, `SessionMetadata`, and `SessionLabels` to the SDK, allowing tools to update session properties, metadata, and labels
 - Add `customer`, `agent`, `mode`, and `title` properties to SDK `Session` class
 
 ### Changed
 
+- Rename `ToolProvidedGuideline` to `TransientGuideline` across the codebase
 - Upgrade MCP service and bump dependency versions to resolve security vulnerabilities
 
 ### Deprecated

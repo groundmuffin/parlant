@@ -74,7 +74,7 @@ from parlant.core.sessions import (
     EventKind,
     Session,
     ToolEventData,
-    ToolProvidedGuideline,
+    TransientGuideline,
 )
 from parlant.core.engines.alpha.guideline_matching.guideline_matcher import (
     GuidelineMatcher,
@@ -1870,7 +1870,7 @@ class AlphaEngine(Engine):
         ]
 
     def _inject_transient_guidelines(self, context: EngineContext) -> None:
-        """Extract virtual guidelines from tool results, inject them as ordinary
+        """Extract transient guidelines from tool results, inject them as ordinary
         guideline matches, and re-apply priority filtering on the combined set."""
         tool_guideline_matches = self._extract_guidelines_from_tool_results(
             context.state.tool_events
@@ -1907,7 +1907,7 @@ class AlphaEngine(Engine):
         self,
         tool_events: Sequence[EmittedEvent],
     ) -> Sequence[GuidelineMatch]:
-        """Extract virtual guidelines from tool results and convert them to GuidelineMatch objects.
+        """Extract transient guidelines from tool results and convert them to GuidelineMatch objects.
 
         This follows the same pattern as _utterance_requests_to_guideline_matches:
         synthetic Guideline instances with fake IDs, injected into ordinary_guideline_matches.
@@ -1919,9 +1919,7 @@ class AlphaEngine(Engine):
             tool_calls = cast(ToolEventData, tool_event.data)["tool_calls"]
             for tool_call in tool_calls:
                 tool_id = tool_call["tool_id"]
-                guidelines: Sequence[ToolProvidedGuideline] = tool_call["result"].get(
-                    "guidelines", []
-                )
+                guidelines: Sequence[TransientGuideline] = tool_call["result"].get("guidelines", [])
                 for guideline_data in guidelines:
                     guideline_index += 1
                     matches.append(

@@ -146,6 +146,37 @@ class Context:
 
             await asyncio.sleep(0.1)
 
+    async def receive_message_events(
+        self,
+        min_offset: int,
+        wait_for_data: int = 30,
+    ) -> list[ClientEvent]:
+        """Receive agent message events from the current session starting at the given offset."""
+        if self._session_id is None:
+            raise ValueError("No session has been created yet")
+
+        events = await self.client.sessions.list_events(
+            session_id=self._session_id,
+            min_offset=min_offset,
+            source="ai_agent",
+            kinds="message",
+            wait_for_data=wait_for_data,
+        )
+
+        result: list[ClientEvent] = []
+        for event in events:
+            if self._is_streaming_in_progress(event):
+                completed = await self._wait_for_streaming_completion(
+                    session_id=self._session_id,
+                    event_id=event.id,
+                    min_offset=min_offset,
+                )
+                result.append(completed)
+            else:
+                result.append(event)
+
+        return result
+
     async def send_and_receive_message(
         self,
         customer_message: str,

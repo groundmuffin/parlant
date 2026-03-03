@@ -140,8 +140,8 @@ class ControlOptions(TypedDict, total=False):
     """The lifespan of the tool result, indicating whether it is valid for the duration of a single response or for the entire session."""
 
 
-class ToolProvidedGuideline(TypedDict):
-    """A virtual guideline returned by a tool, instructing the agent on how to behave for the current response."""
+class TransientGuideline(TypedDict):
+    """A transient guideline returned by a tool, instructing the agent on how to behave for the current response."""
 
     action: str
     """The action the agent should take. This becomes the 'action' part of a condition-action guideline pair."""
@@ -180,8 +180,8 @@ class ToolResult:
     canned_response_fields: Mapping[str, Any]
     """Fields for canned responses, which can be used to provide additional context or information for canned responses."""
 
-    guidelines: Sequence[ToolProvidedGuideline]
-    """Virtual guidelines returned by the tool, which instruct the agent on how to behave for the current response only."""
+    guidelines: Sequence[TransientGuideline]
+    """Transient guidelines returned by the tool, which instruct the agent on how to behave for the current response only."""
 
     def __init__(
         self,
@@ -190,7 +190,7 @@ class ToolResult:
         control: Optional[ControlOptions] = None,
         canned_responses: Optional[Sequence[str]] = None,
         canned_response_fields: Optional[Mapping[str, Any]] = None,
-        guidelines: Optional[Sequence[ToolProvidedGuideline]] = None,
+        guidelines: Optional[Sequence[TransientGuideline]] = None,
     ) -> None:
         object.__setattr__(self, "data", data)
         object.__setattr__(self, "metadata", metadata or {})

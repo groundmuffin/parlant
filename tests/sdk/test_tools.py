@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+from parlant.core.async_utils import default_done_callback
 from parlant.core.customers import CustomerStore
 from parlant.core.sessions import SessionStore
 from parlant.core.tools import ToolContext, ToolResult
 import parlant.sdk as p
 
-from tests.sdk.utils import Context, SDKTest
+from tests.sdk.utils import Context, SDKTest, get_message
+from tests.test_utilities import nlp_test
 
 
 class Test_that_a_tool_is_called_when_triggered_by_user_message(SDKTest):
@@ -233,3 +236,61 @@ class Test_that_a_tool_can_update_session_metadata(SDKTest):
         assert updated_session.metadata.get("priority") == "high", (
             f"Expected session metadata to contain priority=high, got: {updated_session.metadata}"
         )
+
+
+class Test_that_agent_utter_follows_guidelines(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.booked_event = asyncio.Event()
+
+        self.agent = await server.create_agent(
+            name="Utter Test Agent",
+            description="Agent for testing utter",
+        )
+
+        @p.tool
+        async def start_flight_booking(context: ToolContext) -> ToolResult:
+            session = p.Session.current
+
+            async def book_flight() -> None:
+                await asyncio.sleep(3)  # Simulate booking delay
+
+                self.booked_event.set()
+
+                await self.agent.utter(
+                    session=session,
+                    guidelines=[
+                        {"action": "tell the customer the booking is confirmed"},
+                    ],
+                )
+
+            asyncio.create_task(book_flight()).add_done_callback(default_done_callback())
+
+            return ToolResult(
+                data={"status": "booking in progress"},
+                guidelines=[
+                    {"action": "tell the customer you'll confirm the booking shortly"},
+                ],
+            )
+
+        await self.agent.create_observation(
+            condition="the customer asks to book a flight",
+            tools=[start_flight_booking],
+        )
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message_event(
+            customer_message="Please book my flight to Paris",
+            recipient=self.agent,
+        )
+
+        assert await nlp_test(
+            get_message(response), "it says the booking will be confirmed shortly"
+        )
+
+        await asyncio.wait_for(self.booked_event.wait(), timeout=10)
+
+        events = await ctx.receive_message_events(min_offset=response.offset + 1)
+        assert len(events) >= 1, "Expected at least one new agent message after booking"
+
+        last_message = get_message(events[-1])
+        assert await nlp_test(last_message, "it says the booking is confirmed")

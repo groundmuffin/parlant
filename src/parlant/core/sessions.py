@@ -163,7 +163,7 @@ class ControlOptions(TypedDict, total=False):
     lifespan: LifeSpan
 
 
-class ToolProvidedGuideline(TypedDict, total=False):
+class TransientGuideline(TypedDict, total=False):
     action: Required[str]
     condition: str
     priority: int
@@ -177,7 +177,7 @@ class ToolResult(TypedDict):
     control: ControlOptions
     canned_responses: Sequence[str]
     canned_response_fields: Mapping[str, JSONSerializable]
-    guidelines: NotRequired[Sequence[ToolProvidedGuideline]]
+    guidelines: NotRequired[Sequence[TransientGuideline]]
 
 
 class ToolCall(TypedDict):

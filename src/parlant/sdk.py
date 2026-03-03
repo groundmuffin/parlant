@@ -84,6 +84,7 @@ from parlant.api.authorization import (
 
 
 from parlant.core import async_utils
+from parlant.core.application import Application as _Application
 from parlant.core.agents import (
     AgentDocumentStore,
     AgentId,
@@ -121,6 +122,10 @@ from parlant.core.customers import (
     CustomerStore,
 )
 from parlant.core.emissions import EmittedEvent, EventEmitterFactory
+from parlant.core.engines.types import (
+    UtteranceRationale as _UtteranceRationale,
+    UtteranceRequest as _UtteranceRequest,
+)
 from parlant.core.engines.alpha.prompt_builder import PromptBuilder, PromptSection
 from parlant.core.engines.alpha.hooks import EngineHook, EngineHookResult, EngineHooks
 from parlant.core.engines.alpha.engine_context import (
@@ -262,7 +267,7 @@ from parlant.core.tools import (
     SessionStatus,
     Tool,
     ToolContext,
-    ToolProvidedGuideline,
+    TransientGuideline,
     ToolId,
     ToolParameterDescriptor,
     ToolParameterOptions,
@@ -3363,6 +3368,32 @@ class Agent:
 
         self._server._retrievers[self.id][id] = retriever
 
+    async def utter(
+        self,
+        session: Session,
+        *,
+        guidelines: Sequence[TransientGuideline],
+    ) -> str:
+        """Generate an agent message in the given session following the provided transient guidelines.
+
+        Args:
+            session: The session in which to generate the message.
+            guidelines: Transient guidelines (action + optional fields) the agent should follow.
+
+        Returns:
+            The generated message text.
+        """
+        app = self._container[_Application]
+        requests = [
+            _UtteranceRequest(
+                action=g["action"],
+                rationale=_UtteranceRationale.UNSPECIFIED,
+            )
+            for g in guidelines
+        ]
+        event = await app.sessions.utter(session.id, requests)
+        return cast(str, cast(dict[str, Any], event.data)["message"])
+
     @classproperty
     def current(cls) -> Agent:
         """Get the current agent from the asyncio task context.
@@ -5294,7 +5325,7 @@ __all__ = [
     "ToolContextAccessor",
     "ToolEntry",
     "ToolEventData",
-    "ToolProvidedGuideline",
+    "TransientGuideline",
     "ToolId",
     "ToolParameterDescriptor",
     "ToolParameterOptions",

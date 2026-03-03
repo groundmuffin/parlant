@@ -39,7 +39,7 @@ from parlant.core.sessions import Event, SessionId, ToolResult
 from parlant.core.tools import (
     Tool,
     ToolContext,
-    ToolProvidedGuideline,
+    TransientGuideline,
     ToolId,
     ToolService,
     DEFAULT_PARAMETER_PRECEDENCE,
@@ -250,8 +250,8 @@ class ToolCaller:
         )
 
     @staticmethod
-    def _serialize_tool_guideline(g: ToolProvidedGuideline) -> ToolProvidedGuideline:
-        data = ToolProvidedGuideline(
+    def _serialize_tool_guideline(g: TransientGuideline) -> TransientGuideline:
+        data = TransientGuideline(
             action=g["action"],
             condition=g.get("condition", ""),
         )
