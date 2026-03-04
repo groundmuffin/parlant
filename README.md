@@ -398,8 +398,6 @@ Drop-in chat component to get a frontend running immediately.
 
 **If Parlant helps you build better agents, **[give it a star](https://github.com/emcie-co/parlant)** — it helps others find the project.**
 
-[![Star History Chart](https://api.star-history.com/svg?repos=emcie-co/parlant&type=Date)](https://star-history.com/#emcie-co/parlant&Date)
-
 ## License
 
 Apache 2.0 — free for commercial use.
