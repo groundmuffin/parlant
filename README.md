@@ -47,10 +47,12 @@
 
 Conversational context engineering is hard because real-world interactions are diverse, nuanced, and non-linear.
 
+### ❌ The Problem: What you've probably tried and couldn't get to work at scale
 **System prompts** work until production complexity kicks in. The more instructions you add to a prompt, the faster your agent stops paying attention to any of them.
 
 **Routed graphs** solve the prompt-overload problem, but the more routing you add, the more fragile it becomes when faced with the chaos of natural interactions.
 
+### 🔑 The Solution: Context engineering, optimized for conversational control
 Parlant solves this with [context engineering](https://www.gartner.com/en/articles/context-engineering): getting the right context, no more and no less, into the prompt at the right time. You define your rules, knowledge, and tools once; the engine narrows the context in real-time to what's immediately relevant to the current turn.
 
 <img alt="Parlant Demo" src="https://github.com/emcie-co/parlant/blob/develop/docs/demo.gif?raw=true" width="100%" />
