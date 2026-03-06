@@ -294,3 +294,69 @@ class Test_that_agent_utter_follows_guidelines(SDKTest):
 
         last_message = get_message(events[-1])
         assert await nlp_test(last_message, "it says the booking is confirmed")
+
+
+class Test_that_a_guideline_with_custom_tag_is_followed(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tag Test Agent",
+            description="Agent for testing custom tags",
+        )
+
+        tag = await server.create_tag("vip")
+
+        await self.agent.create_guideline(
+            condition="always, in all circumstances",
+            action="Offer a Pepsi",
+            tags=[tag],
+        )
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello there",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" in response.lower(), f"Expected 'pepsi' in response but got: {response}"
+
+
+class Test_that_tag_reevaluation_triggers_guideline_after_tool_call(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.tool_called = False
+
+        self.agent = await server.create_agent(
+            name="Tag Reeval Agent",
+            description="Agent for testing tag-based reevaluation",
+        )
+
+        tag = await server.create_tag("post-lookup")
+
+        @p.tool
+        async def verify_account(context: ToolContext, account_id: str) -> ToolResult:
+            self.tool_called = True
+            return ToolResult(data={"verified": True})
+
+        await self.agent.create_observation(
+            condition="the customer asks to verify their account",
+            tools=[verify_account],
+        )
+
+        await self.agent.create_guideline(
+            condition="the customer's account has been verified",
+            action="Offer a Pepsi",
+            tags=[tag],
+        )
+
+        await tag.reevaluate_after(verify_account)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Please verify my account, ID is 12345",
+            recipient=self.agent,
+        )
+
+        assert self.tool_called, "Expected verify_account tool to be called but it was not"
+        assert "pepsi" in response.lower(), (
+            f"Expected 'pepsi' in response (reevaluation should trigger the tagged guideline "
+            f"after the tool returns) but got: {response}"
+        )

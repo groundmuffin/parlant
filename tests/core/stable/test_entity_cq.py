@@ -17,6 +17,7 @@ from lagom import Container
 
 from parlant.core.agents import Agent, AgentStore
 from parlant.core.capabilities import CapabilityStore
+from parlant.core.engines.alpha.tool_calling.tool_caller import ToolCallEvaluation, ToolInsights
 from parlant.core.entity_cq import EntityQueries
 from parlant.core.glossary import GlossaryStore
 from parlant.core.journey_guideline_projection import JourneyGuidelineProjection
@@ -30,6 +31,7 @@ from parlant.core.canned_responses import CannedResponseStore
 from parlant.core.guidelines import GuidelineStore
 from parlant.core.journeys import JourneyStore
 from parlant.core.tags import Tag, TagId, TagStore
+from parlant.core.tools import ToolId
 
 
 async def test_that_list_guidelines_with_mutual_agent_tag_are_returned(
@@ -591,3 +593,66 @@ async def test_that_canned_responses_can_be_found_for_a_guideline(
     assert any(canrep_4.id == r.id for r in results)
 
     assert all(canrep_3.id != r.id for r in results)
+
+
+async def test_that_find_guidelines_that_need_reevaluation_finds_guidelines_by_tag(
+    container: Container,
+    agent: Agent,
+) -> None:
+    entity_queries = container[EntityQueries]
+    guideline_store = container[GuidelineStore]
+    relationship_store = container[RelationshipStore]
+    agent_store = container[AgentStore]
+
+    custom_tag_id = TagId("custom-tag")
+    tool_id = ToolId(service_name="built-in", tool_name="verify_account")
+
+    await agent_store.upsert_tag(
+        agent_id=agent.id,
+        tag_id=TagId("agent-tag"),
+    )
+
+    guideline = await guideline_store.create_guideline(
+        condition="the customer's account has been verified",
+        action="Offer a Pepsi",
+    )
+
+    await guideline_store.upsert_tag(
+        guideline_id=guideline.id,
+        tag_id=TagId("agent-tag"),
+    )
+
+    await guideline_store.upsert_tag(
+        guideline_id=guideline.id,
+        tag_id=custom_tag_id,
+    )
+
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(
+            id=custom_tag_id,
+            kind=RelationshipEntityKind.TAG,
+        ),
+        target=RelationshipEntity(
+            id=tool_id,
+            kind=RelationshipEntityKind.TOOL,
+        ),
+        kind=RelationshipKind.REEVALUATION,
+    )
+
+    tool_insights = ToolInsights(
+        evaluations=[(tool_id, ToolCallEvaluation.NEEDS_TO_RUN)],
+    )
+
+    # Re-read the guideline after tags were upserted
+    guideline = await guideline_store.read_guideline(guideline.id)
+
+    available_guidelines = {guideline.id: guideline}
+
+    result = await entity_queries.find_guidelines_that_need_reevaluation(
+        available_guidelines=available_guidelines,
+        active_journeys=[],
+        tool_insights=tool_insights,
+    )
+
+    assert len(result) == 1
+    assert result[0].id == guideline.id

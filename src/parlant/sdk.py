@@ -824,6 +824,41 @@ class Tag:
 
     id: TagId
     name: str
+    _server: Optional[Server] = field(default=None, repr=False)
+
+    async def reevaluate_after(self, tool: ToolEntry) -> Relationship:
+        """Creates a reevaluation relationship between this tag and a tool.
+
+        When the tool is called, all guidelines tagged with this tag
+        will be reevaluated."""
+        if self._server is None:
+            raise SDKError(
+                "Tag reevaluation can only be performed during the server startup scope."
+            )
+
+        relationship = await self._server._container[RelationshipStore].create_relationship(
+            source=RelationshipEntity(
+                id=self.id,
+                kind=RelationshipEntityKind.TAG,
+            ),
+            target=RelationshipEntity(
+                id=ToolId(service_name=INTEGRATED_TOOL_SERVICE_NAME, tool_name=tool.tool.name),
+                kind=RelationshipEntityKind.TOOL,
+            ),
+            kind=RelationshipKind.REEVALUATION,
+        )
+
+        return Relationship(
+            id=relationship.id,
+            kind=relationship.kind,
+            source=relationship.source.id,
+            target=relationship.target.id,
+        )
+
+
+def _tags_from_ids(tag_ids: Sequence[TagId]) -> list[Tag]:
+    """Convert a sequence of TagIds to a list of Tag objects, using the ID as the name."""
+    return [Tag(id=tag_id, name=str(tag_id)) for tag_id in tag_ids]
 
 
 @dataclass(frozen=True)
@@ -946,7 +981,7 @@ class Guideline:
     id: GuidelineId
     condition: str
     action: str | None
-    tags: Sequence[TagId]
+    tags: Sequence[Tag]
     metadata: Mapping[str, JSONSerializable]
 
     _server: Server
@@ -2212,7 +2247,7 @@ class Journey:
     conditions: list[Guideline]
     states: Sequence[JourneyState]
     transitions: Sequence[JourneyTransition[JourneyState]]
-    tags: Sequence[TagId]
+    tags: Sequence[Tag]
     composition_mode: CompositionMode | None
 
     _start_state_id: JourneyStateId
@@ -2390,6 +2425,7 @@ class Journey:
         on_message: Callable[[EngineContext, GuidelineMatch], Awaitable[None]] | None = None,
         canned_response_field_provider: Callable[[EngineContext], Awaitable[Mapping[str, Any]]]
         | None = None,
+        tags: Sequence[Tag] = [],
         id: GuidelineId | None = None,
         track: bool = True,
         labels: Iterable[str] = (),
@@ -2410,7 +2446,7 @@ class Journey:
             on_match=on_match,
             on_message=on_message,
             canned_response_field_provider=canned_response_field_provider,
-            tags=None,
+            tags=[t.id for t in tags] if tags else None,
             relationship_target_tag_id=_Tag.for_journey_id(self.id),
             id=id,
             track=track,
@@ -2435,6 +2471,7 @@ class Journey:
         on_match: Callable[[EngineContext, GuidelineMatch], Awaitable[None]] | None = None,
         canned_response_field_provider: Callable[[EngineContext], Awaitable[Mapping[str, Any]]]
         | None = None,
+        tags: Sequence[Tag] = [],
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
         priority: int = 0,
@@ -2450,6 +2487,7 @@ class Journey:
             matcher=matcher,
             on_match=on_match,
             canned_response_field_provider=canned_response_field_provider,
+            tags=tags,
             labels=labels,
             dependencies=dependencies,
             priority=priority,
@@ -2625,7 +2663,7 @@ class Capability:
     title: str
     description: str
     signals: Sequence[str]
-    tags: Sequence[TagId]
+    tags: Sequence[Tag]
 
 
 @dataclass(frozen=True)
@@ -2636,7 +2674,7 @@ class Term:
     name: str
     description: str
     synonyms: Sequence[str]
-    tags: Sequence[TagId]
+    tags: Sequence[Tag]
 
 
 @dataclass(frozen=True)
@@ -2648,7 +2686,7 @@ class Variable:
     description: str | None
     tool: ToolEntry | None
     freshness_rules: str | None
-    tags: Sequence[TagId]
+    tags: Sequence[Tag]
     _server: Server
     _container: Container
 
@@ -2785,7 +2823,7 @@ class Customer:
         id: CustomerId,
         name: str,
         metadata: Mapping[str, str],
-        tags: Sequence[TagId],
+        tags: Sequence[Tag],
         _server: Optional[Server] = None,
     ) -> None:
         self._id = id
@@ -2811,7 +2849,7 @@ class Customer:
         return self._metadata
 
     @property
-    def tags(self) -> Sequence[TagId]:
+    def tags(self) -> Sequence[Tag]:
         return self._tags
 
     @classproperty
@@ -2841,7 +2879,7 @@ class Customer:
             id=core_customer.id,
             name=core_customer.name,
             metadata=core_customer.extra,
-            tags=core_customer.tags,
+            tags=_tags_from_ids(core_customer.tags),
         )
 
     async def update(
@@ -2871,7 +2909,7 @@ class Customer:
 
         updated = await customer_store.read_customer(self._id)
         self._name = updated.name
-        self._tags = updated.tags
+        self._tags = _tags_from_ids(updated.tags)
 
 
 @dataclass(frozen=True)
@@ -2985,7 +3023,7 @@ class ExperimentalAgentFeatures:
             title=capability.title,
             description=capability.description,
             signals=capability.signals,
-            tags=capability.tags,
+            tags=_tags_from_ids(capability.tags),
         )
 
 
@@ -3002,7 +3040,7 @@ class Agent:
     max_engine_iterations: int
     composition_mode: CompositionMode
     output_mode: OutputMode
-    tags: Sequence[TagId]
+    tags: Sequence[Tag]
 
     retrievers: Mapping[str, RetrieverFunction] = field(default_factory=dict)
 
@@ -3020,6 +3058,7 @@ class Agent:
         composition_mode: CompositionMode | None = None,
         on_match: Callable[[EngineContext, JourneyMatch], Awaitable[None]] | None = None,
         on_message: Callable[[EngineContext, JourneyMatch], Awaitable[None]] | None = None,
+        tags: Sequence[Tag] = [],
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
         priority: int = 0,
@@ -3032,6 +3071,7 @@ class Agent:
             title,
             description,
             conditions,
+            tags=[t.id for t in tags],
             id=id,
             composition_mode=composition_mode,
             on_match=on_match,
@@ -3042,12 +3082,18 @@ class Agent:
 
         await self.attach_journey(journey)
 
+        for tag in tags:
+            await self._container[JourneyStore].upsert_tag(
+                journey.id,
+                tag.id,
+            )
+
         result = Journey(
             id=journey.id,
             title=journey.title,
             description=description,
             conditions=journey.conditions,
-            tags=journey.tags,
+            tags=[*journey.tags, *tags],
             states=journey.states,
             transitions=journey.transitions,
             composition_mode=journey.composition_mode,
@@ -3088,6 +3134,7 @@ class Agent:
         on_message: Callable[[EngineContext, GuidelineMatch], Awaitable[None]] | None = None,
         canned_response_field_provider: Callable[[EngineContext], Awaitable[Mapping[str, Any]]]
         | None = None,
+        tags: Sequence[Tag] = [],
         track: bool = True,
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
@@ -3107,7 +3154,7 @@ class Agent:
             on_match=on_match,
             on_message=on_message,
             canned_response_field_provider=canned_response_field_provider,
-            tags=[_Tag.for_agent_id(self.id)],
+            tags=[_Tag.for_agent_id(self.id), *[t.id for t in tags]],
             relationship_target_tag_id=None,
             id=id,
             track=track,
@@ -3133,6 +3180,7 @@ class Agent:
         on_match: Callable[[EngineContext, GuidelineMatch], Awaitable[None]] | None = None,
         canned_response_field_provider: Callable[[EngineContext], Awaitable[Mapping[str, Any]]]
         | None = None,
+        tags: Sequence[Tag] = [],
         labels: Iterable[str] = (),
         dependencies: Sequence[Guideline | Journey] = [],
         priority: int = 0,
@@ -3149,6 +3197,7 @@ class Agent:
             on_match=on_match,
             criticality=criticality,
             canned_response_field_provider=canned_response_field_provider,
+            tags=tags,
             labels=labels,
             dependencies=dependencies,
             priority=priority,
@@ -3237,7 +3286,7 @@ class Agent:
             name=term.name,
             description=term.description,
             synonyms=term.synonyms,
-            tags=term.tags,
+            tags=_tags_from_ids(term.tags),
         )
 
     async def create_variable(
@@ -3268,7 +3317,7 @@ class Agent:
             description=variable.description,
             tool=tool,
             freshness_rules=variable.freshness_rules,
-            tags=variable.tags,
+            tags=_tags_from_ids(variable.tags),
             _server=self._server,
             _container=self._container,
         )
@@ -3289,7 +3338,7 @@ class Agent:
                 if variable.tool_id
                 else None,
                 freshness_rules=variable.freshness_rules,
-                tags=variable.tags,
+                tags=_tags_from_ids(variable.tags),
                 _server=self._server,
                 _container=self._container,
             )
@@ -3339,7 +3388,7 @@ class Agent:
             if variable.tool_id
             else None,
             freshness_rules=variable.freshness_rules,
-            tags=variable.tags,
+            tags=_tags_from_ids(variable.tags),
             _server=self._server,
             _container=self._container,
         )
@@ -3428,7 +3477,7 @@ class Agent:
             max_engine_iterations=core_agent.max_engine_iterations,
             composition_mode=composition_mode_map[core_agent.composition_mode],
             output_mode=core_agent.message_output_mode or OutputMode.BLOCK,
-            tags=core_agent.tags,
+            tags=_tags_from_ids(core_agent.tags),
         )
 
 
@@ -4077,7 +4126,7 @@ class Server:
             id=guideline.id,
             condition=condition or "",
             action=action,
-            tags=guideline.tags,
+            tags=_tags_from_ids(guideline.tags),
             metadata=guideline.metadata,
             labels=guideline.labels,
             priority=guideline.priority,
@@ -4587,6 +4636,7 @@ class Server:
         return Tag(
             id=tag.id,
             name=tag.name,
+            _server=self,
         )
 
     async def create_agent(
@@ -4660,7 +4710,7 @@ class Server:
             max_engine_iterations=agent.max_engine_iterations,
             composition_mode=CompositionMode(agent.composition_mode),
             output_mode=agent.message_output_mode or OutputMode.BLOCK,
-            tags=tags,
+            tags=_tags_from_ids(tags),
             _server=self,
             _container=self._container,
         )
@@ -4678,7 +4728,7 @@ class Server:
                 max_engine_iterations=a.max_engine_iterations,
                 composition_mode=CompositionMode(a.composition_mode),
                 output_mode=a.message_output_mode or OutputMode.BLOCK,
-                tags=a.tags,
+                tags=_tags_from_ids(a.tags),
                 _server=self,
                 _container=self._container,
             )
@@ -4698,7 +4748,7 @@ class Server:
                 max_engine_iterations=agent.max_engine_iterations,
                 composition_mode=CompositionMode(agent.composition_mode),
                 output_mode=agent.message_output_mode or OutputMode.BLOCK,
-                tags=agent.tags,
+                tags=_tags_from_ids(agent.tags),
                 _server=self,
                 _container=self._container,
             )
@@ -4754,7 +4804,7 @@ class Server:
             id=customer.id,
             name=customer.name,
             metadata=customer.extra,
-            tags=customer.tags,
+            tags=_tags_from_ids(customer.tags),
             _server=self,
         )
 
@@ -4768,7 +4818,7 @@ class Server:
                 id=c.id,
                 name=c.name,
                 metadata=c.extra,
-                tags=c.tags,
+                tags=_tags_from_ids(c.tags),
             )
             for c in customers
         ]
@@ -4796,7 +4846,7 @@ class Server:
                 id=customer.id,
                 name=customer.name,
                 metadata=customer.extra,
-                tags=customer.tags,
+                tags=_tags_from_ids(customer.tags),
             )
 
         if name:
@@ -4807,7 +4857,7 @@ class Server:
                     id=customer.id,
                     name=customer.name,
                     metadata=customer.extra,
-                    tags=customer.tags,
+                    tags=_tags_from_ids(customer.tags),
                 )
 
         return None
@@ -4856,7 +4906,7 @@ class Server:
                     id=guideline.id,
                     condition=guideline.content.condition,
                     action=guideline.content.action,
-                    tags=guideline.tags,
+                    tags=_tags_from_ids(guideline.tags),
                     metadata=guideline.metadata,
                     _server=self,
                     _container=self._container,
@@ -4881,7 +4931,7 @@ class Server:
             conditions=condition_guidelines,
             states=[],
             transitions=[],
-            tags=tags,
+            tags=_tags_from_ids(tags),
             composition_mode=CompositionMode._from_core_composition_mode(
                 stored_journey.composition_mode
             ),

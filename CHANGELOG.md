@@ -6,6 +6,9 @@ All notable changes to Parlant will be documented here.
 
 ### Added
 
+- Add `tags` parameter to `create_guideline`, `create_observation`, and `create_journey` on both `Agent` and `Journey`, allowing custom tags to be attached to entities at creation time
+- Add `Tag.reevaluate_after()` method to the SDK, enabling tag-based reevaluation relationships with tools
+- Add tag-based reevaluation support in the engine: when a tool fires, all guidelines carrying a tag that has a reevaluation relationship with that tool are now re-evaluated
 - Add staged_events to GuidelineMatchingContext in SDK
 - Add `priority` property to guidelines and journeys for priority-based filtering in the relational resolver
 - Add transient guidelines (renamed from tool-provided guidelines), allowing tools to dynamically inject behavioral guidelines into the agent's context
@@ -16,6 +19,7 @@ All notable changes to Parlant will be documented here.
 
 ### Changed
 
+- Change `tags` field type from `Sequence[TagId]` to `Sequence[Tag]` on `Guideline`, `Journey`, `Capability`, `Term`, `Variable`, `Customer`, and `Agent` in the SDK
 - Rename `ToolProvidedGuideline` to `TransientGuideline` across the codebase
 - Upgrade MCP service and bump dependency versions to resolve security vulnerabilities
 
