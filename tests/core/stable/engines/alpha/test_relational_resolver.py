@@ -1500,3 +1500,486 @@ async def test_that_relational_resolver_transitively_filters_guideline_depending
     # - g2 is deprioritized by g1
     # - g3 depends on tag t1, whose member g2 was deprioritized, so g3 is filtered
     assert result.matches == [GuidelineMatch(guideline=g1, score=9, rationale="")]
+
+
+async def test_that_guideline_level_priority_overrides_tag_level_priority(
+    container: Container,
+) -> None:
+    """
+    Tests that guideline-level prioritization takes precedence over tag-level:
+    - t1 prioritizes over t2 (tag-level: all of t1 beats all of t2)
+    - g2_1 prioritizes over g1_1 (guideline-level override)
+    - After resolution: g2_1 survives (guideline-level priority beats tag-level),
+      g1_2 survives (tag-level priority over t2, no guideline override),
+      g1_1 is deprioritized by g2_1, g2_2 is deprioritized by t1.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    g1_1 = await guideline_store.create_guideline(condition="a", action="g1_1 action")
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action")
+    g2_1 = await guideline_store.create_guideline(condition="c", action="g2_1 action")
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action")
+
+    await guideline_store.upsert_tag(g1_1.id, t1.id)
+    await guideline_store.upsert_tag(g1_2.id, t1.id)
+    await guideline_store.upsert_tag(g2_1.id, t2.id)
+    await guideline_store.upsert_tag(g2_2.id, t2.id)
+
+    g1_1 = await guideline_store.read_guideline(g1_1.id)
+    g1_2 = await guideline_store.read_guideline(g1_2.id)
+    g2_1 = await guideline_store.read_guideline(g2_1.id)
+    g2_2 = await guideline_store.read_guideline(g2_2.id)
+
+    # t1 prioritizes over t2 (tag-level)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    # g2_1 prioritizes over g1_1 (guideline-level override)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=g2_1.id, kind=RelationshipEntityKind.GUIDELINE),
+        target=RelationshipEntity(id=g1_1.id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [g1_1, g1_2, g2_1, g2_2],
+        [
+            GuidelineMatch(guideline=g1_1, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_1, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_2, score=10, rationale=""),
+        ],
+        journeys=[],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g2_1.id, g1_2.id}
+
+
+async def test_that_tag_priority_deprioritizes_all_guidelines_of_target_tag(
+    container: Container,
+) -> None:
+    """
+    Tests that tag-level prioritization filters out all guidelines of the target tag:
+    - t1 prioritizes over t2
+    - g1_1, g1_2 tagged with t1; g2_1, g2_2 tagged with t2
+    - After resolution only g1_1 and g1_2 remain (t2 guidelines are deprioritized).
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    g1_1 = await guideline_store.create_guideline(condition="a", action="g1_1 action")
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action")
+    g2_1 = await guideline_store.create_guideline(condition="c", action="g2_1 action")
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action")
+
+    await guideline_store.upsert_tag(g1_1.id, t1.id)
+    await guideline_store.upsert_tag(g1_2.id, t1.id)
+    await guideline_store.upsert_tag(g2_1.id, t2.id)
+    await guideline_store.upsert_tag(g2_2.id, t2.id)
+
+    g1_1 = await guideline_store.read_guideline(g1_1.id)
+    g1_2 = await guideline_store.read_guideline(g1_2.id)
+    g2_1 = await guideline_store.read_guideline(g2_1.id)
+    g2_2 = await guideline_store.read_guideline(g2_2.id)
+
+    # t1 prioritizes over t2
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [g1_1, g1_2, g2_1, g2_2],
+        [
+            GuidelineMatch(guideline=g1_1, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_1, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_2, score=10, rationale=""),
+        ],
+        journeys=[],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g1_1.id, g1_2.id}
+
+
+async def test_that_journey_priority_deprioritizes_all_guidelines_of_target_tag(
+    container: Container,
+) -> None:
+    """
+    Tests that a journey prioritizing over a custom tag filters out all
+    guidelines tagged with that tag:
+    - Journey J (with j_cond) prioritizes over t1
+    - g1, g2 tagged with t1
+    - After resolution only j_cond remains (t1 guidelines are deprioritized).
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+
+    g1 = await guideline_store.create_guideline(condition="a", action="g1 action")
+    g2 = await guideline_store.create_guideline(condition="b", action="g2 action")
+
+    await guideline_store.upsert_tag(g1.id, t1.id)
+    await guideline_store.upsert_tag(g2.id, t1.id)
+    g1 = await guideline_store.read_guideline(g1.id)
+    g2 = await guideline_store.read_guideline(g2.id)
+
+    j_cond = await guideline_store.create_guideline(condition="c", action="journey action")
+    journey = await journey_store.create_journey(
+        title="J",
+        description="A journey",
+        conditions=[j_cond.id],
+    )
+
+    # Tag condition guideline with its journey tag (as the real projection does)
+    await guideline_store.upsert_tag(j_cond.id, Tag.for_journey_id(journey.id))
+    j_cond = await guideline_store.read_guideline(j_cond.id)
+
+    # Journey J prioritizes over t1
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(
+            id=Tag.for_journey_id(journey.id), kind=RelationshipEntityKind.TAG
+        ),
+        target=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g2, j_cond],
+        [
+            GuidelineMatch(guideline=g1, score=10, rationale=""),
+            GuidelineMatch(guideline=g2, score=10, rationale=""),
+            GuidelineMatch(guideline=j_cond, score=10, rationale=""),
+        ],
+        journeys=[journey],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {j_cond.id}
+
+
+async def test_that_journey_priority_deprioritizes_target_journey(
+    container: Container,
+) -> None:
+    """
+    Tests that a journey prioritizing over another journey filters out the
+    target journey's node guidelines:
+    - Journey J1 prioritizes over Journey J2
+    - j1_g and j2_g are node guidelines (with journey_node metadata)
+    - After resolution only j1_g remains (j2_g is deprioritized).
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+    j2 = await journey_store.create_journey(title="J2", description="Journey 2", conditions=[])
+
+    j1_g = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+    )
+    j2_g = await guideline_store.create_guideline(
+        condition="b",
+        action="j2 action",
+        metadata={"journey_node": {"journey_id": j2.id}},
+    )
+
+    # J1 prioritizes over J2
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j2.id), kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [j1_g, j2_g],
+        [
+            GuidelineMatch(guideline=j1_g, score=10, rationale=""),
+            GuidelineMatch(guideline=j2_g, score=10, rationale=""),
+        ],
+        journeys=[j1, j2],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {j1_g.id}
+
+
+async def test_that_tag_priority_deprioritizes_target_journey(
+    container: Container,
+) -> None:
+    """
+    Tests that a custom tag prioritizing over a journey filters out the
+    journey's node guidelines:
+    - t1 (with g1, g2) prioritizes over Journey J (with j_g node guideline)
+    - After resolution g1 and g2 remain, j_g is deprioritized.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+
+    g1 = await guideline_store.create_guideline(condition="a", action="g1 action")
+    g2 = await guideline_store.create_guideline(condition="b", action="g2 action")
+
+    await guideline_store.upsert_tag(g1.id, t1.id)
+    await guideline_store.upsert_tag(g2.id, t1.id)
+    g1 = await guideline_store.read_guideline(g1.id)
+    g2 = await guideline_store.read_guideline(g2.id)
+
+    journey = await journey_store.create_journey(
+        title="J",
+        description="A journey",
+        conditions=[],
+    )
+
+    j_g = await guideline_store.create_guideline(
+        condition="c",
+        action="journey action",
+        metadata={"journey_node": {"journey_id": journey.id}},
+    )
+
+    # t1 prioritizes over Journey J
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(
+            id=Tag.for_journey_id(journey.id), kind=RelationshipEntityKind.TAG
+        ),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g2, j_g],
+        [
+            GuidelineMatch(guideline=g1, score=10, rationale=""),
+            GuidelineMatch(guideline=g2, score=10, rationale=""),
+            GuidelineMatch(guideline=j_g, score=10, rationale=""),
+        ],
+        journeys=[journey],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g1.id, g2.id}
+
+
+async def test_that_journey_over_guideline_overrides_tag_level_priority(
+    container: Container,
+) -> None:
+    """
+    Tag-level: t1 prioritizes over t2.
+    Individual-level override: journey j1 (member of t2) prioritizes over g1_1 (member of t1).
+    Result: j1_g survives (override), g1_2 survives (t1, not overridden),
+            g1_1 deprioritized by j1, g2_2 deprioritized by t1.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    g1_1 = await guideline_store.create_guideline(condition="a", action="g1_1 action")
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action")
+
+    await guideline_store.upsert_tag(g1_1.id, t1.id)
+    await guideline_store.upsert_tag(g1_2.id, t1.id)
+    g1_1 = await guideline_store.read_guideline(g1_1.id)
+    g1_2 = await guideline_store.read_guideline(g1_2.id)
+
+    # Create journey j1; use a real guideline with journey_node metadata as its
+    # node representative (projected guidelines are ephemeral and can't be tagged).
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+    j1_g = await guideline_store.create_guideline(
+        condition="c",
+        action="j1 action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t2.id],
+    )
+
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action", tags=[t2.id])
+
+    # t1 prioritizes over t2 (tag-level)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    # j1 prioritizes over g1_1 (individual-level override)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=g1_1.id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [g1_1, g1_2, j1_g, g2_2],
+        [
+            GuidelineMatch(guideline=g1_1, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=j1_g, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_2, score=10, rationale=""),
+        ],
+        journeys=[j1],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {j1_g.id, g1_2.id}
+
+
+async def test_that_guideline_over_journey_overrides_tag_level_priority(
+    container: Container,
+) -> None:
+    """
+    Tag-level: t1 prioritizes over t2.
+    Individual-level override: g2_1 (member of t2) prioritizes over journey j1 (member of t1).
+    Result: g2_1 survives (override), g1_2 survives (t1, not overridden),
+            j1_g deprioritized by g2_1, g2_2 deprioritized by t1.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    # Create journey j1 with a node guideline as member of t1
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+    j1_g = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t1.id],
+    )
+
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action", tags=[t1.id])
+
+    g2_1 = await guideline_store.create_guideline(condition="c", action="g2_1 action", tags=[t2.id])
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action", tags=[t2.id])
+
+    # t1 prioritizes over t2 (tag-level)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    # g2_1 prioritizes over j1 (individual-level override)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=g2_1.id, kind=RelationshipEntityKind.GUIDELINE),
+        target=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [j1_g, g1_2, g2_1, g2_2],
+        [
+            GuidelineMatch(guideline=j1_g, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_1, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_2, score=10, rationale=""),
+        ],
+        journeys=[j1],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g2_1.id, g1_2.id}
+
+
+async def test_that_journey_over_journey_overrides_tag_level_priority(
+    container: Container,
+) -> None:
+    """
+    Tag-level: t1 prioritizes over t2.
+    Individual-level override: journey j2 (member of t2) prioritizes over journey j1 (member of t1).
+    Result: j2_g survives (override), g1_2 survives (t1, not overridden),
+            j1_g deprioritized by j2, g2_2 deprioritized by t1.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    # Create journey j1 with a node guideline as member of t1
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+    j1_g = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t1.id],
+    )
+
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action", tags=[t1.id])
+
+    # Create journey j2 with a node guideline as member of t2
+    j2 = await journey_store.create_journey(title="J2", description="Journey 2", conditions=[])
+    j2_g = await guideline_store.create_guideline(
+        condition="c",
+        action="j2 action",
+        metadata={"journey_node": {"journey_id": j2.id}},
+        tags=[t2.id],
+    )
+
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action", tags=[t2.id])
+
+    # t1 prioritizes over t2 (tag-level)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    # j2 prioritizes over j1 (individual-level override)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=Tag.for_journey_id(j2.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [j1_g, g1_2, j2_g, g2_2],
+        [
+            GuidelineMatch(guideline=j1_g, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=j2_g, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_2, score=10, rationale=""),
+        ],
+        journeys=[j1, j2],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {j2_g.id, g1_2.id}

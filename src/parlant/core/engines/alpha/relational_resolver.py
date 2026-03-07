@@ -72,6 +72,95 @@ class RelationalResolver:
 
         return None
 
+    def _is_journey_node_guideline(self, guideline: Guideline) -> bool:
+        """Check if a guideline is a journey node guideline (projected from a journey graph).
+
+        Journey node guidelines are the actionable guidelines produced by
+        JourneyGuidelineProjection. They carry journey_node metadata and represent
+        the journey's behavior (actions, transitions).
+
+        This is distinct from journey CONDITION guidelines, which are plain
+        observations tagged with the journey tag. Condition guidelines should not
+        be subject to journey-level prioritization or deprioritization because:
+        1. They are observations that may serve purposes beyond activating a journey.
+        2. Their only role in the journey is gating whether node guidelines enter scope.
+        3. Deprioritizing them would incorrectly remove useful observations from the
+           agent's context.
+
+        Note (2026-03-07): Journey root node sentinels (nodes with no action that
+        serve as the graph entry point) also carry journey_node metadata and would
+        be subject to deprioritization here. This is fine — root sentinels are
+        purely navigational and never reach the message generator. Moreover, as of
+        this writing, root sentinels do not reach this code path at all: they are
+        filtered out by the guideline matching strategy before the relational
+        resolver runs.
+        """
+        return "journey_node" in guideline.metadata
+
+    async def _has_individual_level_override(
+        self,
+        match: GuidelineMatch,
+        prioritizing_tag_id: TagId,
+        cache: dict[
+            tuple[RelationshipKind, bool, str, GuidelineId | TagId | ToolId], list[Relationship]
+        ],
+    ) -> bool:
+        """Check if the match has individual-level priority that overrides tag-level deprioritization.
+
+        When a match is about to be deprioritized by a tag-level priority relationship
+        (e.g., t1 → t2), this checks whether the match (or its journey) has a direct
+        priority relationship targeting a member of the prioritizing tag. Individual-level
+        priority takes precedence over tag-level priority.
+        """
+        # Collect priority relationships where match is SOURCE
+        override_rels: list[Relationship] = list(
+            await self._get_relationships(
+                cache, RelationshipKind.PRIORITY, True, source_id=match.guideline.id
+            )
+        )
+
+        if self._is_journey_node_guideline(match.guideline):
+            if journey_id := self._extract_journey_id_from_guideline(match.guideline):
+                override_rels.extend(
+                    await self._get_relationships(
+                        cache,
+                        RelationshipKind.PRIORITY,
+                        True,
+                        source_id=Tag.for_journey_id(cast(JourneyId, journey_id)),
+                    )
+                )
+
+        if not override_rels:
+            return False
+
+        # Get the members of the prioritizing tag
+        prioritizing_members = await self._guideline_store.list_guidelines(
+            tags=[prioritizing_tag_id]
+        )
+        prioritizing_member_ids = {g.id for g in prioritizing_members}
+
+        for rel in override_rels:
+            if (
+                rel.target.kind == RelationshipEntityKind.GUIDELINE
+                and rel.target.id in prioritizing_member_ids
+            ):
+                return True
+
+            if rel.target.kind == RelationshipEntityKind.TAG:
+                target_tag_id = cast(TagId, rel.target.id)
+                if target_journey_id := Tag.extract_journey_id(target_tag_id):
+                    # Targeting a journey — check if any node guideline of that
+                    # journey is a member of the prioritizing tag
+                    for member in prioritizing_members:
+                        if self._is_journey_node_guideline(member):
+                            member_journey_id = cast(
+                                dict[str, str], member.metadata.get("journey_node", {})
+                            ).get("journey_id")
+                            if member_journey_id == target_journey_id:
+                                return True
+
+        return False
+
     def _matches_equal(
         self, matches1: Sequence[GuidelineMatch], matches2: Sequence[GuidelineMatch]
     ) -> bool:
@@ -363,13 +452,32 @@ class RelationalResolver:
                 cache, RelationshipKind.PRIORITY, True, target_id=match.guideline.id
             )
 
-            if journey_id := self._extract_journey_id_from_guideline(match.guideline):
+            # Only journey node guidelines (projected from the journey graph) are
+            # subject to journey-level prioritization. Condition guidelines carry
+            # the journey tag but are plain observations — they should not be
+            # deprioritized when the journey is deprioritized.
+            if self._is_journey_node_guideline(match.guideline):
+                if journey_id := self._extract_journey_id_from_guideline(match.guideline):
+                    priority_relationships.extend(
+                        await self._get_relationships(
+                            cache,
+                            RelationshipKind.PRIORITY,
+                            True,
+                            target_id=Tag.for_journey_id(journey_id),
+                        )
+                    )
+
+            for tag_id in match.guideline.tags:
+                # Skip journey tags — journey-level prioritization is handled
+                # above for node guidelines only.
+                if Tag.extract_journey_id(tag_id):
+                    continue
                 priority_relationships.extend(
                     await self._get_relationships(
                         cache,
                         RelationshipKind.PRIORITY,
                         True,
-                        target_id=Tag.for_journey_id(journey_id),
+                        target_id=tag_id,
                     )
                 )
 
@@ -408,6 +516,17 @@ class RelationalResolver:
                         ),
                         None,
                     ):
+                        # For tag-level deprioritization (custom tag → custom tag),
+                        # check if the match has an individual-level priority override.
+                        # Individual-level priority (guideline→guideline, guideline→journey,
+                        # journey→guideline, journey→journey) takes precedence over
+                        # tag-level priority.
+                        if not Tag.extract_journey_id(cast(TagId, prioritized_entity.id)):
+                            if await self._has_individual_level_override(
+                                match, cast(TagId, prioritized_entity.id), cache
+                            ):
+                                continue
+
                         deprioritized = True
                         break
 
@@ -438,10 +557,13 @@ class RelationalResolver:
             if not deprioritized:
                 result.append(match)
             else:
-                # Track deprioritized entities for transitive filtering
+                # Track deprioritized entities for transitive filtering.
+                # Only node guidelines (metadata-based) contribute to deprioritized
+                # journey tracking — condition guidelines are not deprioritized.
                 deprioritized_guideline_ids.add(match.guideline.id)
-                if journey_id := self._extract_journey_id_from_guideline(match.guideline):
-                    deprioritized_journey_ids.add(cast(JourneyId, journey_id))
+                if self._is_journey_node_guideline(match.guideline):
+                    if journey_id := self._extract_journey_id_from_guideline(match.guideline):
+                        deprioritized_journey_ids.add(cast(JourneyId, journey_id))
 
                 if prioritized_guideline_id:
                     prioritized_guideline = next(

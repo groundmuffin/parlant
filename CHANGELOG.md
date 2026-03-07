@@ -19,6 +19,7 @@ All notable changes to Parlant will be documented here.
 - Add `Customer.update()` and `CustomerMetadata` to the SDK, allowing tools to update customer name and metadata
 - Add `Session.update()`, `SessionMetadata`, and `SessionLabels` to the SDK, allowing tools to update session properties, metadata, and labels
 - Add `customer`, `agent`, `mode`, and `title` properties to SDK `Session` class
+- Add individual-level priority override of tag-level priority in the relational resolver (e.g., a specific guideline or journey can override a tag-wide deprioritization)
 
 ### Changed
 
