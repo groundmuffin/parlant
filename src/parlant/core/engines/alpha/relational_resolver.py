@@ -508,10 +508,17 @@ class RelationalResolver:
                     depends_on_deprioritized = True
                     break
 
-                # Check if depends on a deprioritized journey
+                # Check if depends on a deprioritized journey or custom tag
                 if dependency.target.kind == RelationshipEntityKind.TAG:
                     if journey_id := Tag.extract_journey_id(cast(TagId, dependency.target.id)):
                         if journey_id in deprioritized_journey_ids:
+                            depends_on_deprioritized = True
+                            break
+                    else:
+                        tagged_guidelines = await self._guideline_store.list_guidelines(
+                            tags=[cast(TagId, dependency.target.id)]
+                        )
+                        if any(g.id in deprioritized_guideline_ids for g in tagged_guidelines):
                             depends_on_deprioritized = True
                             break
 

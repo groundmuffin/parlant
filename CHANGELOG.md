@@ -6,6 +6,7 @@ All notable changes to Parlant will be documented here.
 
 ### Added
 
+- Accept `Tag` as a target in `depend_on()`, `exclude()`, and `prioritize_over()` on both `Guideline` and `Tag`, enabling relationships that target all guidelines sharing a custom tag
 - Add `Tag.depend_on()`, `Tag.exclude()`, and `Tag.prioritize_over()` methods to the SDK, enabling tag-based dependency and priority relationships with guidelines and journeys
 - Support custom TAG as source for DEPENDENCY relationships in the relational resolver
 - Add `tags` parameter to `create_guideline`, `create_observation`, and `create_journey` on both `Agent` and `Journey`, allowing custom tags to be attached to entities at creation time
@@ -32,6 +33,7 @@ All notable changes to Parlant will be documented here.
 
 ### Fixed
 
+- Fix transitive filtering in relational resolver for custom tag dependency targets (guidelines depending on a custom tag are now correctly deactivated when a tagged member is deprioritized)
 - Fix SSE `read_event` endpoint stalling after first streaming chunk until full completion
 - Fix response analysis logs not always reaching the integrated UI
 - Fix guideline formatting in canned response and streaming modes when condition is absent

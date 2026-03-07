@@ -1445,3 +1445,58 @@ async def test_that_relational_resolver_filters_tagged_guideline_when_custom_tag
     )
 
     assert result.matches == []
+
+
+async def test_that_relational_resolver_transitively_filters_guideline_depending_on_custom_tag_with_deprioritized_member(
+    container: Container,
+) -> None:
+    """
+    Tests the transitive effect of priority + dependency via a custom tag:
+    - g1 prioritizes over g2
+    - g2 is tagged with t1
+    - g3 depends on tag t1
+    - When all three are matched, g2 is deprioritized by g1,
+      then g3 is transitively filtered (t1 member g2 was deprioritized).
+      Only g1 remains.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    resolver = container[RelationalResolver]
+
+    g1 = await guideline_store.create_guideline(condition="a", action="Recommend Pepsi")
+    g2 = await guideline_store.create_guideline(condition="b", action="Recommend Coke")
+    g3 = await guideline_store.create_guideline(condition="c", action="Recommend Sprite")
+
+    t1 = await tag_store.create_tag(name="drink-group")
+    await guideline_store.upsert_tag(g2.id, t1.id)
+    g2 = await guideline_store.read_guideline(g2.id)
+
+    # g1 prioritizes over g2 (g2 gets deprioritized)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=g1.id, kind=RelationshipEntityKind.GUIDELINE),
+        target=RelationshipEntity(id=g2.id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    # g3 depends on tag t1 (i.e. all guidelines tagged with t1 being active)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=g3.id, kind=RelationshipEntityKind.GUIDELINE),
+        target=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g2, g3],
+        [
+            GuidelineMatch(guideline=g1, score=9, rationale=""),
+            GuidelineMatch(guideline=g2, score=7, rationale=""),
+            GuidelineMatch(guideline=g3, score=6, rationale=""),
+        ],
+        journeys=[],
+    )
+
+    # Only g1 should remain:
+    # - g2 is deprioritized by g1
+    # - g3 depends on tag t1, whose member g2 was deprioritized, so g3 is filtered
+    assert result.matches == [GuidelineMatch(guideline=g1, score=9, rationale="")]

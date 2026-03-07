@@ -866,7 +866,7 @@ class Tag:
 
     async def _create_relationship(
         self,
-        target: Guideline | Journey,
+        target: Guideline | Journey | Tag,
         kind: RelationshipKind,
     ) -> Relationship:
         server = self._server
@@ -874,13 +874,15 @@ class Tag:
             raise SDKError("Tag relationships can only be created during the server startup scope.")
 
         entity_source = RelationshipEntity(id=self.id, kind=RelationshipEntityKind.TAG)
-        entity_target = (
-            RelationshipEntity(id=target.id, kind=RelationshipEntityKind.GUIDELINE)
-            if isinstance(target, Guideline)
-            else RelationshipEntity(
+
+        if isinstance(target, Guideline):
+            entity_target = RelationshipEntity(id=target.id, kind=RelationshipEntityKind.GUIDELINE)
+        elif isinstance(target, Tag):
+            entity_target = RelationshipEntity(id=target.id, kind=RelationshipEntityKind.TAG)
+        else:
+            entity_target = RelationshipEntity(
                 id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
             )
-        )
 
         relationship = await server._container[RelationshipStore].create_relationship(
             source=entity_source,
@@ -895,19 +897,19 @@ class Tag:
             target=relationship.target.id,
         )
 
-    async def prioritize_over(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
-        """Creates priority relationships with other guidelines or journeys."""
+    async def prioritize_over(self, *targets: Guideline | Journey | Tag) -> Sequence[Relationship]:
+        """Creates priority relationships with other guidelines, journeys, or tags."""
         if not targets:
             raise SDKError("At least one target must be provided for prioritization.")
 
         return [await self._create_relationship(t, RelationshipKind.PRIORITY) for t in targets]
 
-    async def exclude(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
-        """Alias for prioritize_over. Creates priority relationships with other guidelines or journeys."""
+    async def exclude(self, *targets: Guideline | Journey | Tag) -> Sequence[Relationship]:
+        """Alias for prioritize_over. Creates priority relationships with other guidelines, journeys, or tags."""
         return await self.prioritize_over(*targets)
 
-    async def depend_on(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
-        """Creates dependency relationships with other guidelines or journeys."""
+    async def depend_on(self, *targets: Guideline | Journey | Tag) -> Sequence[Relationship]:
+        """Creates dependency relationships with other guidelines, journeys, or tags."""
         if not targets:
             raise SDKError("At least one target must be provided for dependency.")
 
@@ -1056,8 +1058,8 @@ class Guideline:
             direction="source",
         )
 
-    async def prioritize_over(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
-        """Creates priority relationships with other guidelines or journeys."""
+    async def prioritize_over(self, *targets: Guideline | Journey | Tag) -> Sequence[Relationship]:
+        """Creates priority relationships with other guidelines, journeys, or tags."""
         if not targets:
             raise SDKError("At least one target must be provided for prioritization.")
 
@@ -1070,12 +1072,12 @@ class Guideline:
             for t in targets
         ]
 
-    async def exclude(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
-        """Alias for prioritize_over. Creates priority relationships with other guidelines or journeys."""
+    async def exclude(self, *targets: Guideline | Journey | Tag) -> Sequence[Relationship]:
+        """Alias for prioritize_over. Creates priority relationships with other guidelines, journeys, or tags."""
         return await self.prioritize_over(*targets)
 
-    async def depend_on(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
-        """Creates dependency relationships with other guidelines or journeys."""
+    async def depend_on(self, *targets: Guideline | Journey | Tag) -> Sequence[Relationship]:
+        """Creates dependency relationships with other guidelines, journeys, or tags."""
         if not targets:
             raise SDKError("At least one target must be provided for dependency.")
 
@@ -1161,28 +1163,27 @@ class Guideline:
 
     async def _create_relationship(
         self,
-        target: Guideline | Journey,
+        target: Guideline | Journey | Tag,
         kind: RelationshipKind,
         direction: Literal["source", "target"],
     ) -> Relationship:
-        if direction == "source":
-            entity_source = RelationshipEntity(id=self.id, kind=RelationshipEntityKind.GUIDELINE)
-            entity_target = (
-                RelationshipEntity(id=target.id, kind=RelationshipEntityKind.GUIDELINE)
-                if isinstance(target, Guideline)
-                else RelationshipEntity(
-                    id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
-                )
-            )
+        if isinstance(target, Guideline):
+            other_entity = RelationshipEntity(id=target.id, kind=RelationshipEntityKind.GUIDELINE)
+        elif isinstance(target, Tag):
+            other_entity = RelationshipEntity(id=target.id, kind=RelationshipEntityKind.TAG)
         else:
-            entity_source = (
-                RelationshipEntity(id=target.id, kind=RelationshipEntityKind.GUIDELINE)
-                if isinstance(target, Guideline)
-                else RelationshipEntity(
-                    id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
-                )
+            other_entity = RelationshipEntity(
+                id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
             )
-            entity_target = RelationshipEntity(id=self.id, kind=RelationshipEntityKind.GUIDELINE)
+
+        self_entity = RelationshipEntity(id=self.id, kind=RelationshipEntityKind.GUIDELINE)
+
+        if direction == "source":
+            entity_source = self_entity
+            entity_target = other_entity
+        else:
+            entity_source = other_entity
+            entity_target = self_entity
 
         relationship = await self._container[RelationshipStore].create_relationship(
             source=entity_source,
