@@ -173,7 +173,7 @@ class Test_that_a_reevaluation_relationship_can_be_created(SDKTest):
         def test_tool(context: ToolContext) -> ToolResult:
             return ToolResult(data={})
 
-        self.relationship = await self.g1.reevaluate_after(tool=test_tool)
+        [self.relationship] = await self.g1.reevaluate_after(test_tool)
 
     async def run(self, ctx: Context) -> None:
         relationship_store = ctx.container[RelationshipStore]

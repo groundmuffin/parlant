@@ -826,34 +826,43 @@ class Tag:
     name: str
     _server: Optional[Server] = field(default=None, repr=False)
 
-    async def reevaluate_after(self, tool: ToolEntry) -> Relationship:
-        """Creates a reevaluation relationship between this tag and a tool.
+    async def reevaluate_after(self, *tools: ToolEntry) -> Sequence[Relationship]:
+        """Creates reevaluation relationships between this tag and one or more tools.
 
-        When the tool is called, all guidelines tagged with this tag
+        When any of the tools is called, all guidelines tagged with this tag
         will be reevaluated."""
         if self._server is None:
             raise SDKError(
                 "Tag reevaluation can only be performed during the server startup scope."
             )
 
-        relationship = await self._server._container[RelationshipStore].create_relationship(
-            source=RelationshipEntity(
-                id=self.id,
-                kind=RelationshipEntityKind.TAG,
-            ),
-            target=RelationshipEntity(
-                id=ToolId(service_name=INTEGRATED_TOOL_SERVICE_NAME, tool_name=tool.tool.name),
-                kind=RelationshipEntityKind.TOOL,
-            ),
-            kind=RelationshipKind.REEVALUATION,
-        )
+        if not tools:
+            raise SDKError("At least one tool must be provided for reevaluation.")
 
-        return Relationship(
-            id=relationship.id,
-            kind=relationship.kind,
-            source=relationship.source.id,
-            target=relationship.target.id,
-        )
+        results: list[Relationship] = []
+        for t in tools:
+            relationship = await self._server._container[RelationshipStore].create_relationship(
+                source=RelationshipEntity(
+                    id=self.id,
+                    kind=RelationshipEntityKind.TAG,
+                ),
+                target=RelationshipEntity(
+                    id=ToolId(service_name=INTEGRATED_TOOL_SERVICE_NAME, tool_name=t.tool.name),
+                    kind=RelationshipEntityKind.TOOL,
+                ),
+                kind=RelationshipKind.REEVALUATION,
+            )
+
+            results.append(
+                Relationship(
+                    id=relationship.id,
+                    kind=relationship.kind,
+                    source=relationship.source.id,
+                    target=relationship.target.id,
+                )
+            )
+
+        return results
 
     async def _create_relationship(
         self,
@@ -1102,26 +1111,35 @@ class Guideline:
             for t in guideline_targets + journey_conditions
         ]
 
-    async def reevaluate_after(self, tool: ToolEntry) -> Relationship:
-        """Creates a reevaluation relationship with a tool."""
-        relationship = await self._container[RelationshipStore].create_relationship(
-            source=RelationshipEntity(
-                id=self.id,
-                kind=RelationshipEntityKind.GUIDELINE,
-            ),
-            target=RelationshipEntity(
-                id=ToolId(service_name=INTEGRATED_TOOL_SERVICE_NAME, tool_name=tool.tool.name),
-                kind=RelationshipEntityKind.TOOL,
-            ),
-            kind=RelationshipKind.REEVALUATION,
-        )
+    async def reevaluate_after(self, *tools: ToolEntry) -> Sequence[Relationship]:
+        """Creates reevaluation relationships with one or more tools."""
+        if not tools:
+            raise SDKError("At least one tool must be provided for reevaluation.")
 
-        return Relationship(
-            id=relationship.id,
-            kind=relationship.kind,
-            source=relationship.source.id,
-            target=relationship.target.id,
-        )
+        results: list[Relationship] = []
+        for t in tools:
+            relationship = await self._container[RelationshipStore].create_relationship(
+                source=RelationshipEntity(
+                    id=self.id,
+                    kind=RelationshipEntityKind.GUIDELINE,
+                ),
+                target=RelationshipEntity(
+                    id=ToolId(service_name=INTEGRATED_TOOL_SERVICE_NAME, tool_name=t.tool.name),
+                    kind=RelationshipEntityKind.TOOL,
+                ),
+                kind=RelationshipKind.REEVALUATION,
+            )
+
+            results.append(
+                Relationship(
+                    id=relationship.id,
+                    kind=relationship.kind,
+                    source=relationship.source.id,
+                    target=relationship.target.id,
+                )
+            )
+
+        return results
 
     async def attach_retriever(
         self,

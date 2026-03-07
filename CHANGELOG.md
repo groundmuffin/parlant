@@ -21,6 +21,7 @@ All notable changes to Parlant will be documented here.
 
 ### Changed
 
+- Change `reevaluate_after()` on `Tag` and `Guideline` to accept multiple tools (`*tools`) and return `Sequence[Relationship]`
 - Change `tags` field type from `Sequence[TagId]` to `Sequence[Tag]` on `Guideline`, `Journey`, `Capability`, `Term`, `Variable`, `Customer`, and `Agent` in the SDK
 - Rename `ToolProvidedGuideline` to `TransientGuideline` across the codebase
 - Upgrade MCP service and bump dependency versions to resolve security vulnerabilities
