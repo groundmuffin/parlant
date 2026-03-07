@@ -20,6 +20,7 @@ All notable changes to Parlant will be documented here.
 - Add `Session.update()`, `SessionMetadata`, and `SessionLabels` to the SDK, allowing tools to update session properties, metadata, and labels
 - Add `customer`, `agent`, `mode`, and `title` properties to SDK `Session` class
 - Add individual-level priority override of tag-level priority in the relational resolver (e.g., a specific guideline or journey can override a tag-wide deprioritization)
+- Add individual-level dependency override of tag-level dependency in the relational resolver (e.g., a specific guideline or journey can satisfy its dependency individually even when the tag-wide dependency is unmet)
 
 ### Changed
 

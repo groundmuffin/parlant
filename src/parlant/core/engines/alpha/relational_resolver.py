@@ -161,6 +161,73 @@ class RelationalResolver:
 
         return False
 
+    async def _has_individual_level_dependency_override(
+        self,
+        match: GuidelineMatch,
+        depended_tag_id: TagId,
+        matched_guideline_ids: set[GuidelineId],
+        journeys: Sequence[Journey],
+        cache: dict[
+            tuple[RelationshipKind, bool, str, GuidelineId | TagId | ToolId], list[Relationship]
+        ],
+    ) -> bool:
+        """Check if the match has an individual-level dependency that overrides tag-level.
+
+        When a tag-level dependency is unmet (e.g., t1 depends on t2 but not all t2
+        members are matched), this checks whether the match (or its journey) has a
+        direct dependency on a specific member of the depended-upon tag that IS met.
+        Individual-level dependency takes precedence over tag-level dependency.
+        """
+        # Collect dependency relationships where match is directly the source
+        direct_deps: list[Relationship] = list(
+            await self._get_relationships(
+                cache, RelationshipKind.DEPENDENCY, True, source_id=match.guideline.id
+            )
+        )
+
+        if self._is_journey_node_guideline(match.guideline):
+            if journey_id := self._extract_journey_id_from_guideline(match.guideline):
+                direct_deps.extend(
+                    await self._get_relationships(
+                        cache,
+                        RelationshipKind.DEPENDENCY,
+                        True,
+                        source_id=Tag.for_journey_id(cast(JourneyId, journey_id)),
+                    )
+                )
+
+        if not direct_deps:
+            return False
+
+        # Get members of the depended-upon tag
+        tag_members = await self._guideline_store.list_guidelines(tags=[depended_tag_id])
+        tag_member_ids = {g.id for g in tag_members}
+
+        for dep in direct_deps:
+            # Individual dep targets a specific guideline that is a member of the
+            # tag AND is matched
+            if (
+                dep.target.kind == RelationshipEntityKind.GUIDELINE
+                and dep.target.id in tag_member_ids
+                and dep.target.id in matched_guideline_ids
+            ):
+                return True
+
+            # Individual dep targets a journey whose node guidelines are members
+            # of the tag AND the journey is active
+            if dep.target.kind == RelationshipEntityKind.TAG:
+                if target_journey_id := Tag.extract_journey_id(cast(TagId, dep.target.id)):
+                    if any(j.id == target_journey_id for j in journeys):
+                        for member in tag_members:
+                            if self._is_journey_node_guideline(member):
+                                member_journey_id = cast(
+                                    dict[str, str], member.metadata.get("journey_node", {})
+                                ).get("journey_id")
+                                if member_journey_id == target_journey_id:
+                                    return True
+
+        return False
+
     def _matches_equal(
         self, matches1: Sequence[GuidelineMatch], matches2: Sequence[GuidelineMatch]
     ) -> bool:
@@ -402,9 +469,11 @@ class RelationalResolver:
                         tags=[cast(TagId, dependency.target.id)]
                     )
 
+                    tag_dep_unmet = False
+
                     for g in guidelines_associated_to_tag:
                         if g.id not in matched_guideline_ids:
-                            dependent_on_inactive_guidelines = True
+                            tag_dep_unmet = True
                             break
 
                         if g.id not in iterated_guidelines:
@@ -415,6 +484,32 @@ class RelationalResolver:
                             )
 
                     iterated_guidelines.update(g.id for g in guidelines_associated_to_tag)
+
+                    if tag_dep_unmet:
+                        # For tag-level dependencies (custom tag → custom tag),
+                        # check if the match has an individual-level dependency
+                        # override. Individual-level dependency (guideline→guideline,
+                        # guideline→journey, journey→guideline, journey→journey)
+                        # takes precedence over tag-level dependency.
+                        is_tag_level_dep = (
+                            dependency.source.kind == RelationshipEntityKind.TAG
+                            and not Tag.extract_journey_id(cast(TagId, dependency.source.id))
+                        )
+
+                        if (
+                            is_tag_level_dep
+                            and await self._has_individual_level_dependency_override(
+                                match,
+                                cast(TagId, dependency.target.id),
+                                matched_guideline_ids,
+                                journeys,
+                                cache,
+                            )
+                        ):
+                            pass  # Override — skip this tag-level dependency
+                        else:
+                            dependent_on_inactive_guidelines = True
+                            break
 
             if not dependent_on_inactive_guidelines:
                 result.append(match)

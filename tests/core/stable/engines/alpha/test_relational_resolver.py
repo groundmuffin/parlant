@@ -1983,3 +1983,465 @@ async def test_that_journey_over_journey_overrides_tag_level_priority(
 
     result_ids = {m.guideline.id for m in result.matches}
     assert result_ids == {j2_g.id, g1_2.id}
+
+
+# ── Tag-level dependency tests ──────────────────────────────────────────────
+
+
+async def test_that_tag_dependency_deactivates_tagged_guidelines_when_target_guideline_not_met(
+    container: Container,
+) -> None:
+    """
+    t1 depends on g2. g1 tagged t1, g2 untagged, g3 untagged.
+    g2 NOT matched → t1 dependency unmet → g1 deactivated.
+    Result: {g3}
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+
+    g1 = await guideline_store.create_guideline(condition="a", action="g1 action", tags=[t1.id])
+    g2 = await guideline_store.create_guideline(condition="b", action="g2 action")
+    g3 = await guideline_store.create_guideline(condition="c", action="g3 action")
+
+    # t1 depends on g2
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=g2.id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g2, g3],
+        [
+            GuidelineMatch(guideline=g1, score=10, rationale=""),
+            # g2 NOT matched
+            GuidelineMatch(guideline=g3, score=10, rationale=""),
+        ],
+        journeys=[],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g3.id}
+
+
+async def test_that_tag_dependency_deactivates_tagged_guidelines_when_target_tag_not_met(
+    container: Container,
+) -> None:
+    """
+    t1 depends on t2. g1 tagged t1, g2 tagged t2, g3 untagged.
+    g2 is NOT matched → t2 dependency unmet → g1 deactivated.
+    Result: {g3}
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    g1 = await guideline_store.create_guideline(condition="a", action="g1 action", tags=[t1.id])
+    g2 = await guideline_store.create_guideline(condition="b", action="g2 action", tags=[t2.id])
+    g3 = await guideline_store.create_guideline(condition="c", action="g3 action")
+
+    # t1 depends on t2
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g2, g3],
+        [
+            GuidelineMatch(guideline=g1, score=10, rationale=""),
+            # g2 NOT matched
+            GuidelineMatch(guideline=g3, score=10, rationale=""),
+        ],
+        journeys=[],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g3.id}
+
+
+async def test_that_journey_dependency_deactivates_node_guidelines_when_target_tag_not_met(
+    container: Container,
+) -> None:
+    """
+    Journey j1 depends on t1. j1_g is a j1 node guideline, g1 tagged t1, g_extra untagged.
+    g1 NOT matched → t1 dependency unmet → j1_g deactivated.
+    Result: {g_extra}
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+
+    g1 = await guideline_store.create_guideline(condition="a", action="g1 action", tags=[t1.id])
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+    j1_g = await guideline_store.create_guideline(
+        condition="b",
+        action="j1 action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+    )
+
+    g_extra = await guideline_store.create_guideline(condition="c", action="extra action")
+
+    # j1 depends on t1
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [g1, j1_g, g_extra],
+        [
+            # g1 NOT matched
+            GuidelineMatch(guideline=j1_g, score=10, rationale=""),
+            GuidelineMatch(guideline=g_extra, score=10, rationale=""),
+        ],
+        journeys=[j1],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g_extra.id}
+
+
+async def test_that_tag_dependency_deactivates_tagged_guidelines_when_target_journey_not_active(
+    container: Container,
+) -> None:
+    """
+    t1 depends on journey j1. g1 tagged t1, g_extra untagged.
+    j1 NOT in active journeys → t1 dependency unmet → g1 deactivated.
+    Result: {g_extra}
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+
+    g1 = await guideline_store.create_guideline(condition="a", action="g1 action", tags=[t1.id])
+    g_extra = await guideline_store.create_guideline(condition="b", action="extra action")
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+
+    # t1 depends on j1
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g_extra],
+        [
+            GuidelineMatch(guideline=g1, score=10, rationale=""),
+            GuidelineMatch(guideline=g_extra, score=10, rationale=""),
+        ],
+        journeys=[],  # j1 NOT active
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g_extra.id}
+
+
+async def test_that_journey_dependency_deactivates_node_guidelines_when_target_journey_not_active(
+    container: Container,
+) -> None:
+    """
+    Journey j1 depends on journey j2. j1_g is a j1 node guideline, g_extra untagged.
+    j2 NOT in active journeys → j1 dependency unmet → j1_g deactivated.
+    Result: {g_extra}
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+    j2 = await journey_store.create_journey(title="J2", description="Journey 2", conditions=[])
+
+    j1_g = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+    )
+
+    g_extra = await guideline_store.create_guideline(condition="b", action="extra action")
+
+    # j1 depends on j2
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j2.id), kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [j1_g, g_extra],
+        [
+            GuidelineMatch(guideline=j1_g, score=10, rationale=""),
+            GuidelineMatch(guideline=g_extra, score=10, rationale=""),
+        ],
+        journeys=[j1],  # j2 NOT active
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g_extra.id}
+
+
+# ── Individual-level dependency override tests ──────────────────────────────
+
+
+async def test_that_guideline_level_dependency_overrides_tag_level_dependency(
+    container: Container,
+) -> None:
+    """
+    Tag-level: t1 depends on t2 (all t1 members need all t2 members matched).
+    Individual-level: g1_1 (member of t1) depends on g2_1 (member of t2).
+    g2_1 matched, g2_2 NOT matched — tag-level dependency unmet.
+    Result: g1_1 survives (its individual dependency on g2_1 is met),
+            g1_2 deactivated (no individual override).
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    g1_1 = await guideline_store.create_guideline(condition="a", action="g1_1 action", tags=[t1.id])
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action", tags=[t1.id])
+    g2_1 = await guideline_store.create_guideline(condition="c", action="g2_1 action", tags=[t2.id])
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action", tags=[t2.id])
+
+    # t1 depends on t2 (tag-level)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    # g1_1 depends on g2_1 (individual-level override)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=g1_1.id, kind=RelationshipEntityKind.GUIDELINE),
+        target=RelationshipEntity(id=g2_1.id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [g1_1, g1_2, g2_1, g2_2],
+        [
+            GuidelineMatch(guideline=g1_1, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_1, score=10, rationale=""),
+            # g2_2 NOT matched
+        ],
+        journeys=[],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g1_1.id, g2_1.id}
+
+
+async def test_that_journey_over_guideline_dependency_overrides_tag_level_dependency(
+    container: Container,
+) -> None:
+    """
+    Tag-level: t1 depends on t2.
+    Individual-level: journey j1 (member of t1 via j1_g) depends on g2_1 (member of t2).
+    g2_1 matched, g2_2 NOT matched — tag-level dependency unmet.
+    Result: j1_g survives (journey's individual dependency met),
+            g1_2 deactivated (no individual override).
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+    j1_g = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t1.id],
+    )
+
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action", tags=[t1.id])
+
+    g2_1 = await guideline_store.create_guideline(condition="c", action="g2_1 action", tags=[t2.id])
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action", tags=[t2.id])
+
+    # t1 depends on t2 (tag-level)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    # j1 depends on g2_1 (individual-level override)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=g2_1.id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [j1_g, g1_2, g2_1, g2_2],
+        [
+            GuidelineMatch(guideline=j1_g, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=g2_1, score=10, rationale=""),
+            # g2_2 NOT matched
+        ],
+        journeys=[j1],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {j1_g.id, g2_1.id}
+
+
+async def test_that_guideline_over_journey_dependency_overrides_tag_level_dependency(
+    container: Container,
+) -> None:
+    """
+    Tag-level: t1 depends on t2.
+    Individual-level: g1_1 (member of t1) depends on journey j2 (member of t2).
+    j2 active, g2_2 NOT matched — tag-level dependency unmet.
+    Result: g1_1 survives (individual dependency on j2 met),
+            g1_2 deactivated (no individual override).
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    g1_1 = await guideline_store.create_guideline(condition="a", action="g1_1 action", tags=[t1.id])
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action", tags=[t1.id])
+
+    j2 = await journey_store.create_journey(title="J2", description="Journey 2", conditions=[])
+    j2_g = await guideline_store.create_guideline(
+        condition="c",
+        action="j2 action",
+        metadata={"journey_node": {"journey_id": j2.id}},
+        tags=[t2.id],
+    )
+
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action", tags=[t2.id])
+
+    # t1 depends on t2 (tag-level)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    # g1_1 depends on j2 (individual-level override)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=g1_1.id, kind=RelationshipEntityKind.GUIDELINE),
+        target=RelationshipEntity(id=Tag.for_journey_id(j2.id), kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [g1_1, g1_2, j2_g, g2_2],
+        [
+            GuidelineMatch(guideline=g1_1, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=j2_g, score=10, rationale=""),
+            # g2_2 NOT matched
+        ],
+        journeys=[j2],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g1_1.id, j2_g.id}
+
+
+async def test_that_journey_over_journey_dependency_overrides_tag_level_dependency(
+    container: Container,
+) -> None:
+    """
+    Tag-level: t1 depends on t2.
+    Individual-level: journey j1 (member of t1) depends on journey j2 (member of t2).
+    j2 active, g2_2 NOT matched — tag-level dependency unmet.
+    Result: j1_g survives (journey's individual dependency met),
+            g1_2 deactivated (no individual override).
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+    j1_g = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t1.id],
+    )
+
+    g1_2 = await guideline_store.create_guideline(condition="b", action="g1_2 action", tags=[t1.id])
+
+    j2 = await journey_store.create_journey(title="J2", description="Journey 2", conditions=[])
+    j2_g = await guideline_store.create_guideline(
+        condition="c",
+        action="j2 action",
+        metadata={"journey_node": {"journey_id": j2.id}},
+        tags=[t2.id],
+    )
+
+    g2_2 = await guideline_store.create_guideline(condition="d", action="g2_2 action", tags=[t2.id])
+
+    # t1 depends on t2 (tag-level)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    # j1 depends on j2 (individual-level override)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j2.id), kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [j1_g, g1_2, j2_g, g2_2],
+        [
+            GuidelineMatch(guideline=j1_g, score=10, rationale=""),
+            GuidelineMatch(guideline=g1_2, score=10, rationale=""),
+            GuidelineMatch(guideline=j2_g, score=10, rationale=""),
+            # g2_2 NOT matched
+        ],
+        journeys=[j1, j2],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {j1_g.id, j2_g.id}
