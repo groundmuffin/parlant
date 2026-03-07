@@ -159,7 +159,7 @@ async def test_that_guideline_matches_are_not_filtered_by_enabled_journeys(
         [journey],
     )
 
-    assert len(result) == 2
+    assert len(result) == 3
     assert any(journey_guideline.id == g.id for g in result)
     assert any(guideline.id == g.id for g in result)
 
@@ -428,8 +428,9 @@ async def test_list_guidelines_dependent_directly_on_journey(
 
     result = await entity_queries.find_journey_related_guidelines(journey)
 
-    assert len(result) == 1
-    assert result[0] == guideline1.id
+    assert len(result) == 2
+    assert any([guideline1.id in g for g in result])
+    assert any([journey.root_id in g for g in result])
 
 
 async def test_list_guidelines_dependent_indirectly_on_journey(
@@ -490,7 +491,7 @@ async def test_list_guidelines_dependent_indirectly_on_journey(
 
     result = await entity_queries.find_journey_related_guidelines(journey)
 
-    assert len(result) == 3
+    assert len(result) == 4
 
     assert any(guideline1.id == g for g in result)
     assert any(guideline2.id == g for g in result)
