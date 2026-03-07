@@ -855,6 +855,55 @@ class Tag:
             target=relationship.target.id,
         )
 
+    async def _create_relationship(
+        self,
+        target: Guideline | Journey,
+        kind: RelationshipKind,
+    ) -> Relationship:
+        server = self._server
+        if server is None:
+            raise SDKError("Tag relationships can only be created during the server startup scope.")
+
+        entity_source = RelationshipEntity(id=self.id, kind=RelationshipEntityKind.TAG)
+        entity_target = (
+            RelationshipEntity(id=target.id, kind=RelationshipEntityKind.GUIDELINE)
+            if isinstance(target, Guideline)
+            else RelationshipEntity(
+                id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
+            )
+        )
+
+        relationship = await server._container[RelationshipStore].create_relationship(
+            source=entity_source,
+            target=entity_target,
+            kind=kind,
+        )
+
+        return Relationship(
+            id=relationship.id,
+            kind=relationship.kind,
+            source=relationship.source.id,
+            target=relationship.target.id,
+        )
+
+    async def prioritize_over(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
+        """Creates priority relationships with other guidelines or journeys."""
+        if not targets:
+            raise SDKError("At least one target must be provided for prioritization.")
+
+        return [await self._create_relationship(t, RelationshipKind.PRIORITY) for t in targets]
+
+    async def exclude(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
+        """Alias for prioritize_over. Creates priority relationships with other guidelines or journeys."""
+        return await self.prioritize_over(*targets)
+
+    async def depend_on(self, *targets: Guideline | Journey) -> Sequence[Relationship]:
+        """Creates dependency relationships with other guidelines or journeys."""
+        if not targets:
+            raise SDKError("At least one target must be provided for dependency.")
+
+        return [await self._create_relationship(t, RelationshipKind.DEPENDENCY) for t in targets]
+
 
 def _tags_from_ids(tag_ids: Sequence[TagId]) -> list[Tag]:
     """Convert a sequence of TagIds to a list of Tag objects, using the ID as the name."""

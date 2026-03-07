@@ -1359,3 +1359,89 @@ async def test_that_relational_resolver_filters_mixed_entities_by_priority_with_
     assert len(result.matches) == len(journey_guidelines)
     assert len(result.journeys) == 1
     assert result.journeys[0].id == journey.id
+
+
+async def test_that_relational_resolver_deprioritizes_target_guideline_when_source_is_custom_tag(
+    container: Container,
+) -> None:
+    """
+    Tests that a custom tag used as source in a PRIORITY relationship
+    deprioritizes the target guideline when a guideline tagged with that
+    tag is matched.
+
+    - Tag t1 is attached to g1
+    - t1 PRIORITY → g2
+    - Both g1 and g2 are matched
+    - Expected: g2 is deprioritized, only g1 remains
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    resolver = container[RelationalResolver]
+
+    g1 = await guideline_store.create_guideline(condition="a", action="b")
+    g2 = await guideline_store.create_guideline(condition="c", action="d")
+
+    t1 = await tag_store.create_tag(name="t1")
+    await guideline_store.upsert_tag(g1.id, t1.id)
+    g1 = await guideline_store.read_guideline(g1.id)
+
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=g2.id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g2],
+        [
+            GuidelineMatch(guideline=g1, score=8, rationale=""),
+            GuidelineMatch(guideline=g2, score=5, rationale=""),
+        ],
+        journeys=[],
+    )
+
+    assert len(result.matches) == 1
+    assert result.matches[0].guideline.id == g1.id
+
+
+async def test_that_relational_resolver_filters_tagged_guideline_when_custom_tag_dependency_is_unmet(
+    container: Container,
+) -> None:
+    """
+    Tests that a custom tag used as source in a DEPENDENCY relationship
+    deactivates the tagged guideline when the dependency target is not matched.
+
+    - Tag t1 is attached to g1
+    - t1 DEPENDENCY → g2  (g1, via t1, depends on g2)
+    - g1 is matched but g2 is NOT matched
+    - Expected: g1 is filtered out (unmet dependency via tag)
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    resolver = container[RelationalResolver]
+
+    g1 = await guideline_store.create_guideline(condition="a", action="b")
+    g2 = await guideline_store.create_guideline(condition="c", action="d")
+
+    t1 = await tag_store.create_tag(name="t1")
+    await guideline_store.upsert_tag(g1.id, t1.id)
+    g1 = await guideline_store.read_guideline(g1.id)
+
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=g2.id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g2],
+        [
+            GuidelineMatch(guideline=g1, score=8, rationale=""),
+            # g2 is NOT matched — dependency unmet
+        ],
+        journeys=[],
+    )
+
+    assert result.matches == []

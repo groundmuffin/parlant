@@ -6,6 +6,8 @@ All notable changes to Parlant will be documented here.
 
 ### Added
 
+- Add `Tag.depend_on()`, `Tag.exclude()`, and `Tag.prioritize_over()` methods to the SDK, enabling tag-based dependency and priority relationships with guidelines and journeys
+- Support custom TAG as source for DEPENDENCY relationships in the relational resolver
 - Add `tags` parameter to `create_guideline`, `create_observation`, and `create_journey` on both `Agent` and `Journey`, allowing custom tags to be attached to entities at creation time
 - Add `Tag.reevaluate_after()` method to the SDK, enabling tag-based reevaluation relationships with tools
 - Add tag-based reevaluation support in the engine: when a tool fires, all guidelines carrying a tag that has a reevaluation relationship with that tool are now re-evaluated

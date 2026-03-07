@@ -271,6 +271,16 @@ class RelationalResolver:
                     )
                 )
 
+            for tag_id in match.guideline.tags:
+                dependencies.extend(
+                    await self._get_relationships(
+                        cache,
+                        RelationshipKind.DEPENDENCY,
+                        True,
+                        source_id=tag_id,
+                    )
+                )
+
             if not dependencies:
                 result.append(match)
                 continue
@@ -476,6 +486,16 @@ class RelationalResolver:
             dependencies = await self._get_relationships(
                 cache, RelationshipKind.DEPENDENCY, True, source_id=match.guideline.id
             )
+
+            for tag_id in match.guideline.tags:
+                dependencies.extend(
+                    await self._get_relationships(
+                        cache,
+                        RelationshipKind.DEPENDENCY,
+                        True,
+                        source_id=tag_id,
+                    )
+                )
 
             depends_on_deprioritized = False
 

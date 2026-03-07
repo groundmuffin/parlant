@@ -360,3 +360,70 @@ class Test_that_tag_reevaluation_triggers_guideline_after_tool_call(SDKTest):
             f"Expected 'pepsi' in response (reevaluation should trigger the tagged guideline "
             f"after the tool returns) but got: {response}"
         )
+
+
+class Test_that_tag_prioritize_over_deprioritizes_target_guideline(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tag Priority Agent",
+            description="Agent for testing tag-based prioritization",
+        )
+
+        tag = await server.create_tag("priority-group")
+
+        await self.agent.create_guideline(
+            condition="always, in all circumstances",
+            action="Offer a Pepsi",
+            tags=[tag],
+        )
+
+        g2 = await self.agent.create_guideline(
+            condition="always, in all circumstances",
+            action="Offer orange juice",
+        )
+
+        await tag.prioritize_over(g2)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" in response.lower(), f"Expected 'pepsi' in response but got: {response}"
+        assert "orange" not in response.lower(), (
+            f"Expected 'orange' to be filtered out by tag prioritization but got: {response}"
+        )
+
+
+class Test_that_tag_depend_on_deactivates_tagged_guideline_when_dependency_not_met(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tag Dependency Agent",
+            description="Agent for testing tag-based dependency",
+        )
+
+        tag = await server.create_tag("dep-group")
+
+        await self.agent.create_guideline(
+            condition="always, in all circumstances",
+            action="Offer a Pepsi",
+            tags=[tag],
+        )
+
+        g2 = await self.agent.create_guideline(
+            condition="the customer has explicitly said the word 'banana'",
+            action="Offer Coke",
+        )
+
+        await tag.depend_on(g2)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello, how are you",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" not in response.lower(), (
+            f"Expected 'pepsi' NOT in response (dependency not met) but got: {response}"
+        )
