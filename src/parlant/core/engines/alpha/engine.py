@@ -302,9 +302,6 @@ class AlphaEngine(Engine):
                 if not await self._hooks.call_on_preparation_iteration_end(context):
                     break
 
-            # Inject tool-returned guidelines and re-apply priority filtering.
-            self._inject_transient_guidelines(context)
-
             # Filter problematic tool parameters by precedence.
             await self._inject_tool_insights(context)
 
@@ -313,6 +310,11 @@ class AlphaEngine(Engine):
             ) -> None:
                 if not await self._hooks.call_on_generating_messages(context):
                     return
+
+                # Inject tool-returned guidelines (including those emitted by
+                # retrievers during on_generating_messages) and re-apply
+                # priority filtering.
+                self._inject_transient_guidelines(context)
 
                 # Call on_match handlers for all matched guidelines (before generating messages)
                 await self._call_guideline_handlers(

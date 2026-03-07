@@ -3010,6 +3010,7 @@ class RetrieverResult:
     metadata: Mapping[str, JSONSerializable] = field(default_factory=dict)
     canned_responses: Sequence[str] = field(default_factory=list)
     canned_response_fields: Mapping[str, Any] = field(default_factory=dict)
+    guidelines: Sequence[TransientGuideline] = field(default_factory=list)
 
 
 DeferredRetriever: TypeAlias = Callable[[EngineContext], Awaitable[RetrieverResult | None]]
@@ -4339,6 +4340,18 @@ class Server:
                 # No need to emit tool event if nothing was retrieved.
                 return EngineHookResult.CALL_NEXT
 
+            # Build the tool result
+            tool_result = _SessionToolResult(
+                data=result.data,
+                metadata=result.metadata,
+                control={"lifespan": "response"},
+                canned_responses=[u for u in result.canned_responses],
+                canned_response_fields=result.canned_response_fields,
+            )
+
+            if result.guidelines:
+                tool_result["guidelines"] = list(result.guidelines)
+
             # Emit tool event with retriever data
             ctx.state.tool_events.append(
                 await ctx.response_event_emitter.emit_tool_event(
@@ -4351,13 +4364,7 @@ class Server:
                                     tool_name=retriever_id,
                                 ).to_string(),
                                 arguments={},
-                                result=_SessionToolResult(
-                                    data=result.data,
-                                    metadata=result.metadata,
-                                    control={"lifespan": "response"},
-                                    canned_responses=[u for u in result.canned_responses],
-                                    canned_response_fields=result.canned_response_fields,
-                                ),
+                                result=tool_result,
                             )
                         ]
                     ),
@@ -4657,9 +4664,22 @@ class Server:
                         or retriever_result.metadata
                         or retriever_result.canned_responses
                         or retriever_result.canned_response_fields
+                        or retriever_result.guidelines
                     ):
                         # No need to emit tool event if nothing was retrieved.
                         return EngineHookResult.CALL_NEXT
+
+                    # Build the tool result
+                    tool_result = _SessionToolResult(
+                        data=retriever_result.data,
+                        metadata=retriever_result.metadata,
+                        control={"lifespan": "response"},
+                        canned_responses=[u for u in retriever_result.canned_responses],
+                        canned_response_fields=retriever_result.canned_response_fields,
+                    )
+
+                    if retriever_result.guidelines:
+                        tool_result["guidelines"] = list(retriever_result.guidelines)
 
                     ctx.state.tool_events.append(
                         await ctx.response_event_emitter.emit_tool_event(
@@ -4672,15 +4692,7 @@ class Server:
                                             tool_name=retriever_id,
                                         ).to_string(),
                                         arguments={},
-                                        result=_SessionToolResult(
-                                            data=retriever_result.data,
-                                            metadata=retriever_result.metadata,
-                                            control={"lifespan": "response"},
-                                            canned_responses=[
-                                                u for u in retriever_result.canned_responses
-                                            ],
-                                            canned_response_fields=retriever_result.canned_response_fields,
-                                        ),
+                                        result=tool_result,
                                     )
                                 ]
                             ),
