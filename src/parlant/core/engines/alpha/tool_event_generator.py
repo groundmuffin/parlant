@@ -127,7 +127,7 @@ class ToolEventGenerator:
             trace_id=self._tracer.trace_id,
             data={
                 "status": "processing",
-                "data": {"stage": "Fetching data"},
+                "data": {"stage": "Considering tools"},
             },
         )
 

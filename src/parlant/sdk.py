@@ -257,6 +257,12 @@ from parlant.core.engines.alpha.perceived_performance_policy import (
     BasicPerceivedPerformancePolicy,
     VoiceOptimizedPerceivedPerformancePolicy,
 )
+from parlant.core.engines.alpha.planner import (
+    Plan,
+    Planner,
+    NullPlanner,
+    PlannerProvider,
+)
 from parlant.bin.server import PARLANT_HOME_DIR, start_parlant, StartupParameters
 from parlant.core.services.tools.plugins import PluginServer, ToolEntry, tool
 from parlant.core.tags import Tag as _Tag, TagDocumentStore, TagId, TagStore
@@ -4729,6 +4735,7 @@ class Server:
         tags: Sequence[TagId] = [],
         id: str | None = None,
         perceived_performance_policy: PerceivedPerformancePolicy | None = None,
+        planner: Planner | None = None,
         preamble_config: PreambleConfiguration | None = None,
     ) -> Agent:
         """Creates a new agent with the specified name, description, and composition mode.
@@ -4752,6 +4759,9 @@ class Server:
                 agent identifiers across deployments or integrations.
             perceived_performance_policy: Optional perceived performance policy for this agent.
                 If not specified, the agent will use the default policy (BasicPerceivedPerformancePolicy).
+            planner: Optional planner for this agent. Controls how the engine decides
+                which tools to execute each iteration. If not specified, the agent will
+                use the default planner (NullPlanner).
             preamble_config: Optional preamble configuration for this agent.
                 Allows customizing the preamble examples and adding additional instructions.
 
@@ -4779,6 +4789,9 @@ class Server:
             self._container[PerceivedPerformancePolicyProvider].set_policy(
                 agent.id, perceived_performance_policy
             )
+
+        if planner is not None:
+            self._container[PlannerProvider].set_planner(agent.id, planner)
 
         if preamble_config is not None:
             self._container[CannedResponseGenerator].set_preamble_config(agent.id, preamble_config)
@@ -5412,11 +5425,15 @@ __all__ = [
     "NoMatchResponseProvider",
     "NoModeration",
     "NullPerceivedPerformancePolicy",
+    "NullPlanner",
     "Operation",
     "OutputMode",
     "OptimizationPolicy",
     "PerceivedPerformancePolicy",
     "PerceivedPerformancePolicyProvider",
+    "Plan",
+    "Planner",
+    "PlannerProvider",
     "PluginServer",
     "PreambleConfiguration",
     "ProductionAuthorizationPolicy",

@@ -49,6 +49,7 @@ from parlant.core.engines.alpha.hooks import EngineHooks
 from parlant.core.engines.alpha.perceived_performance_policy import (
     PerceivedPerformancePolicyProvider,
 )
+from parlant.core.engines.alpha.planner import Plan, PlannerProvider
 from parlant.core.engines.alpha.relational_resolver import RelationalResolver
 from parlant.core.engines.alpha.tool_calling.tool_caller import (
     MissingToolData,
@@ -114,6 +115,7 @@ class _PreparationIterationResolution(Enum):
 class _PreparationIterationResult:
     state: IterationState
     resolution: _PreparationIterationResolution
+    plan: Plan
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,7 @@ class AlphaEngine(Engine):
         fluid_message_generator: MessageGenerator,
         canned_response_generator: CannedResponseGenerator,
         perceived_performance_policy_provider: PerceivedPerformancePolicyProvider,
+        planner_provider: PlannerProvider,
         hooks: EngineHooks,
     ) -> None:
         self._logger = logger
@@ -162,6 +165,7 @@ class AlphaEngine(Engine):
         self._canned_response_generator = canned_response_generator
         self._perceived_performance_policy_provider = perceived_performance_policy_provider
 
+        self._planner_provider = planner_provider
         self._hooks = hooks
 
         self._hist_engine_process_duration = self._meter.create_duration_histogram(
@@ -527,6 +531,9 @@ class AlphaEngine(Engine):
         if result.state.executed_tools or check_if_journey_node_with_tool_is_matched():
             return False
 
+        if result.plan.needs_additional_iteration:
+            return False
+
         return True
 
     async def _run_initial_preparation_iteration(
@@ -584,6 +591,10 @@ class AlphaEngine(Engine):
                     executed_tools=[],
                 ),
                 resolution=_PreparationIterationResolution.BAIL,
+                plan=Plan(
+                    needs_additional_iteration=False,
+                    reasoning="Preamble task requested to bail out",
+                ),
             )
 
         # Matched guidelines may use glossary terms, so we need to ground our
@@ -603,6 +614,11 @@ class AlphaEngine(Engine):
                 set(context.state.tool_enabled_guideline_matches.keys())
             ),
         )
+
+        # Let the planner decide which tools and guidelines should be active
+        # for this iteration. The planner may mutate context.state in-place.
+        planner = self._planner_provider.get_planner(context.agent.id)
+        plan = await planner.plan(context)
 
         # Infer any needed tool calls and execute them,
         # adding the resulting tool events to the session.
@@ -638,6 +654,7 @@ class AlphaEngine(Engine):
                 ],
             ),
             resolution=_PreparationIterationResolution.COMPLETED,
+            plan=plan,
         )
 
     async def _run_additional_preparation_iteration(
@@ -685,6 +702,11 @@ class AlphaEngine(Engine):
             ),
         )
 
+        # Let the planner decide which tools and guidelines should be active
+        # for this iteration. The planner may mutate context.state in-place.
+        planner = self._planner_provider.get_planner(context.agent.id)
+        plan = await planner.plan(context)
+
         # Infer any needed tool calls and execute them,
         # adding the resulting tool events to the session.
         if tool_calling_result := await self._call_tools(context, tool_preexecution_state):
@@ -728,6 +750,7 @@ class AlphaEngine(Engine):
                 ],
             ),
             resolution=_PreparationIterationResolution.COMPLETED,
+            plan=plan,
         )
 
     async def _update_session_mode(self, context: EngineContext) -> None:
