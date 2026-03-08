@@ -49,7 +49,7 @@ from parlant.core.engines.alpha.hooks import EngineHooks
 from parlant.core.engines.alpha.perceived_performance_policy import (
     PerceivedPerformancePolicyProvider,
 )
-from parlant.core.engines.alpha.planner import Plan, PlannerProvider
+from parlant.core.engines.alpha.planners import Plan, PlannerProvider
 from parlant.core.engines.alpha.relational_resolver import RelationalResolver
 from parlant.core.engines.alpha.tool_calling.tool_caller import (
     MissingToolData,
@@ -282,6 +282,8 @@ class AlphaEngine(Engine):
 
             await self._initialize_response_state(context)
 
+            previous_plan: Optional[Plan] = None
+
             while not context.state.prepared_to_respond:
                 # Need more data before we're ready to respond
 
@@ -294,7 +296,11 @@ class AlphaEngine(Engine):
                 # This happens in iterations in order to support a feedback loop
                 # where particular tool-call results may trigger new or different
                 # guidelines that we need to follow.
-                iteration_result = await self._run_preparation_iteration(context, preamble_task)
+                iteration_result = await self._run_preparation_iteration(
+                    context, preamble_task, previous_plan
+                )
+
+                previous_plan = iteration_result.plan
 
                 if iteration_result.resolution == _PreparationIterationResolution.BAIL:
                     return
@@ -480,6 +486,7 @@ class AlphaEngine(Engine):
         self,
         context: EngineContext,
         preamble_task: asyncio.Task[bool],
+        previous_plan: Optional[Plan] = None,
     ) -> _PreparationIterationResult:
         with self._tracer.span(
             _PREPARATION_ITERATION_SPAN_NAME.format(
@@ -492,7 +499,10 @@ class AlphaEngine(Engine):
 
             else:
                 # This is an additional iteration, so we run the additional preparation iteration.
-                result = await self._run_additional_preparation_iteration(context)
+                # Pass deferred guidelines from the previous plan so they participate
+                # in resolution alongside newly reevaluated guidelines.
+                deferred = previous_plan.deferred_guideline_matches if previous_plan else {}
+                result = await self._run_additional_preparation_iteration(context, deferred)
 
             context.state.iterations.append(result.state)
             context.state.journey_paths = self._list_journey_paths(context=context)
@@ -660,14 +670,20 @@ class AlphaEngine(Engine):
     async def _run_additional_preparation_iteration(
         self,
         context: EngineContext,
+        deferred_guideline_matches: dict[GuidelineMatch, list[ToolId]] | None = None,
     ) -> _PreparationIterationResult:
         # For optimization concerns, it's useful to capture the exact state
         # we were in before matching guidelines.
         tool_preexecution_state = await self._capture_tool_preexecution_state(context)
 
         # Match and retrieve guidelines and journeys based on the results of the previous iteration.
+        # Deferred guidelines from the previous plan are passed in so they participate
+        # in resolution alongside newly reevaluated guidelines.
         guideline_and_journey_matching_result = (
-            await self._load_additional_matched_guidelines_and_journeys(context)
+            await self._load_additional_matched_guidelines_and_journeys(
+                context,
+                deferred_guideline_matches=deferred_guideline_matches or {},
+            )
         )
 
         # FIXME: There might be cases where a journey got ACTIVATED, and then, during
@@ -695,6 +711,15 @@ class AlphaEngine(Engine):
                 ),
             )
         )
+
+        # Merge deferred guidelines that survived resolution back into
+        # tool_enabled_guideline_matches. Their tool associations are already known
+        # from the previous iteration, so we don't need to re-discover them.
+        resolved_set = set(guideline_and_journey_matching_result.resolved_guidelines)
+        if deferred_guideline_matches:
+            for gm, tool_ids in deferred_guideline_matches.items():
+                if gm in resolved_set and gm not in context.state.tool_enabled_guideline_matches:
+                    context.state.tool_enabled_guideline_matches[gm] = tool_ids
 
         context.state.ordinary_guideline_matches = list(
             set(guideline_and_journey_matching_result.resolved_guidelines).difference(
@@ -1265,6 +1290,7 @@ class AlphaEngine(Engine):
     async def _load_additional_matched_guidelines_and_journeys(
         self,
         context: EngineContext,
+        deferred_guideline_matches: dict[GuidelineMatch, list[ToolId]] | None = None,
     ) -> _GuidelineAndJourneyMatchingResult:
         # Step 1: Retrieve all the possible journeys for this agent
         all_journeys = await self._entity_queries.finds_journeys_for_context(
@@ -1344,6 +1370,14 @@ class AlphaEngine(Engine):
             current_matched=set(matching_result.matches),
             active_journeys=all_activated_journeys,
         )
+
+        # Step 7.5: Merge deferred guidelines from the previous plan.
+        # These are guidelines whose tools the planner chose to defer.
+        # They are included here so they participate in relational resolution
+        # (priority, dependency, etc.) alongside newly reevaluated guidelines.
+        if deferred_guideline_matches:
+            deferred_set = set(deferred_guideline_matches.keys())
+            matched_guidelines = list(set(matched_guidelines) | deferred_set)
 
         resolver_result = await self._relational_resolver.resolve(
             usable_guidelines=list(all_stored_guidelines.values()),

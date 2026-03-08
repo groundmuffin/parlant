@@ -257,11 +257,16 @@ from parlant.core.engines.alpha.perceived_performance_policy import (
     BasicPerceivedPerformancePolicy,
     VoiceOptimizedPerceivedPerformancePolicy,
 )
-from parlant.core.engines.alpha.planner import (
+from parlant.core.engines.alpha.planners import (
+    BasicPlanner,
     Plan,
     Planner,
     NullPlanner,
     PlannerProvider,
+)
+from parlant.core.engines.alpha.planning.basic_planner import (
+    MultiStepPlanner,
+    MultiStepPlanSchema,
 )
 from parlant.bin.server import PARLANT_HOME_DIR, start_parlant, StartupParameters
 from parlant.core.services.tools.plugins import PluginServer, ToolEntry, tool
@@ -5362,6 +5367,7 @@ __all__ = [
     "BasicNoMatchResponseProvider",
     "BasicOptimizationPolicy",
     "BasicPerceivedPerformancePolicy",
+    "BasicPlanner",
     "BasicRateLimiter",
     "CannedResponseId",
     "Capability",
@@ -5420,6 +5426,8 @@ __all__ = [
     "ModerationCheck",
     "ModerationService",
     "ModerationTag",
+    "MultiStepPlanner",
+    "MultiStepPlanSchema",
     "NLPService",
     "NLPServices",
     "NoMatchResponseProvider",

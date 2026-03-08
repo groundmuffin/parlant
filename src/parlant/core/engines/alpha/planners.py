@@ -13,16 +13,30 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from parlant.core.agents import AgentId
 from parlant.core.engines.alpha.engine_context import EngineContext
+from parlant.core.engines.alpha.guideline_matching.guideline_match import GuidelineMatch
+from parlant.core.loggers import Logger
+from parlant.core.tools import ToolId
+from parlant.core.tracer import Tracer
+
+_PLANNER_SPAN_NAME = "planner"
 
 
 @dataclass(frozen=True)
 class Plan:
     needs_additional_iteration: bool
     reasoning: str
+    deferred_guideline_matches: dict[GuidelineMatch, list[ToolId]] = field(default_factory=dict)
+    """Guidelines whose tools were deferred to a later iteration.
+
+    The engine will re-inject these into the next iteration's resolution step,
+    so they participate in relational resolution (priority, dependency, etc.)
+    alongside any newly reevaluated guidelines. The planner will then see them
+    again and can decide whether to run or further defer them.
+    """
 
 
 class Planner(ABC):
@@ -34,6 +48,11 @@ class Planner(ABC):
         or ordinary_guideline_matches) to control which tools and guidelines are active
         for the current iteration. These fields are overwritten at the start of each
         subsequent iteration, so mutations are naturally scoped.
+
+        To defer tools to a later iteration, populate Plan.deferred_guideline_matches.
+        The engine will re-inject deferred guidelines into the next iteration's
+        resolution step, where they participate in relational resolution alongside
+        any newly reevaluated guidelines.
 
         Returns a Plan indicating whether an additional iteration is needed
         (beyond what reevaluation relationships would trigger) and optional reasoning
@@ -48,6 +67,25 @@ class NullPlanner(Planner):
             needs_additional_iteration=False,
             reasoning="",
         )
+
+
+class BasicPlanner(Planner):
+    """Base planner with built-in tracing and logger scoping.
+
+    Derived classes implement do_plan() instead of plan().
+    """
+
+    def __init__(self, logger: Logger, tracer: Tracer) -> None:
+        self._logger = logger
+        self._tracer = tracer
+
+    @abstractmethod
+    async def do_plan(self, context: EngineContext) -> Plan: ...
+
+    async def plan(self, context: EngineContext) -> Plan:
+        with self._logger.scope(type(self).__name__):
+            with self._tracer.span(_PLANNER_SPAN_NAME):
+                return await self.do_plan(context)
 
 
 class PlannerProvider:
