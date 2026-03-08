@@ -98,7 +98,7 @@ class Test_that_condition_guidelines_are_tagged_for_created_journey(SDKTest):
             await guideline_store.read_guideline(guideline_id=g_id) for g_id in journey.conditions
         ]
 
-        assert all(g.tags == [Tag.for_journey_id(self.journey.id)] for g in condition_guidelines)
+        assert all(g.tags == [Tag.for_journey_id(self.journey.id).id] for g in condition_guidelines)
 
 
 class Test_that_condition_guidelines_are_evaluated_in_journey_creation(SDKTest):
@@ -156,7 +156,7 @@ class Test_that_guideline_creation_from_journey_creates_dependency_relationship(
 
         assert relationships
         assert len(relationships) == 1
-        assert relationships[0].target.id == Tag.for_journey_id(self.journey.id)
+        assert relationships[0].target.id == Tag.for_journey_id(self.journey.id).id
 
 
 class Test_that_journey_can_be_created_with_guideline_object_as_condition(SDKTest):
@@ -403,14 +403,17 @@ class Test_that_journey_is_reevaluated_after_tool_call(SDKTest):
             kind=RelationshipKind.REEVALUATION,
             source_id=Tag.for_journey_node_id(
                 self.transition_check_balance.target.id,
-            ),
+            ).id,
         )
 
         assert relationships
         assert len(relationships) == 1
         assert relationships[0].kind == RelationshipKind.REEVALUATION
-        assert relationships[0].source.id == Tag.for_journey_node_id(
-            self.transition_check_balance.target.id,
+        assert (
+            relationships[0].source.id
+            == Tag.for_journey_node_id(
+                self.transition_check_balance.target.id,
+            ).id
         )
 
         assert relationships[0].target.id == ToolId(
@@ -681,7 +684,7 @@ class Test_that_journey_can_depend_on_a_guideline(SDKTest):
         )
 
         assert relationship.kind == RelationshipKind.DEPENDENCY
-        assert relationship.source.id == Tag.for_journey_id(self.journey.id)
+        assert relationship.source.id == Tag.for_journey_id(self.journey.id).id
         assert relationship.target.id == self.guideline.id
 
 
@@ -707,7 +710,7 @@ class Test_that_journey_can_be_created_with_inline_dependencies(SDKTest):
     async def run(self, ctx: Context) -> None:
         relationship_store = ctx.container[RelationshipStore]
         relationships = await relationship_store.list_relationships(
-            source_id=Tag.for_journey_id(self.journey.id),
+            source_id=Tag.for_journey_id(self.journey.id).id,
             kind=RelationshipKind.DEPENDENCY,
         )
 
@@ -782,8 +785,8 @@ class Test_that_journey_guideline_can_be_created_with_canned_responses(SDKTest):
         updated_canrep1 = await canrep_store.read_canned_response(self.canrep1)
         updated_canrep2 = await canrep_store.read_canned_response(self.canrep2)
 
-        assert Tag.for_guideline_id(self.guideline.id) in updated_canrep1.tags
-        assert Tag.for_guideline_id(self.guideline.id) in updated_canrep2.tags
+        assert Tag.for_guideline_id(self.guideline.id).id in updated_canrep1.tags
+        assert Tag.for_guideline_id(self.guideline.id).id in updated_canrep2.tags
 
 
 class Test_that_journey_guideline_with_tools_can_have_canned_responses(SDKTest):
@@ -819,7 +822,7 @@ class Test_that_journey_guideline_with_tools_can_have_canned_responses(SDKTest):
 
         updated_canrep = await canrep_store.read_canned_response(self.canrep)
 
-        assert Tag.for_guideline_id(self.guideline.id) in updated_canrep.tags
+        assert Tag.for_guideline_id(self.guideline.id).id in updated_canrep.tags
 
 
 class Test_that_journey_state_can_have_its_own_canned_responses(SDKTest):
@@ -858,8 +861,8 @@ class Test_that_journey_state_can_have_its_own_canned_responses(SDKTest):
         stored_canrep1 = await canrep_store.read_canned_response(self.canrep1)
         stored_canrep2 = await canrep_store.read_canned_response(self.canrep2)
 
-        assert Tag.for_journey_node_id(self.initial_transition.target.id) in stored_canrep1.tags
-        assert Tag.for_journey_node_id(self.second_transition.target.id) in stored_canrep2.tags
+        assert Tag.for_journey_node_id(self.initial_transition.target.id).id in stored_canrep1.tags
+        assert Tag.for_journey_node_id(self.second_transition.target.id).id in stored_canrep2.tags
 
         response = await ctx.send_and_receive_message_event("Hello", recipient=self.agent)
 

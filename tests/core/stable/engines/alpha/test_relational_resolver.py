@@ -109,11 +109,11 @@ async def test_that_relational_resolver_prioritizes_between_journey_nodes(
 
     await relationship_store.create_relationship(
         source=RelationshipEntity(
-            id=Tag.for_journey_id(j1.id),
+            id=Tag.for_journey_id(j1.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(j2.id),
+            id=Tag.for_journey_id(j2.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         kind=RelationshipKind.PRIORITY,
@@ -192,7 +192,7 @@ async def test_that_relational_resolver_prioritizes_guideline_over_journey(
             kind=RelationshipEntityKind.GUIDELINE,
         ),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id),
+            id=Tag.for_journey_id(journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         kind=RelationshipKind.PRIORITY,
@@ -267,7 +267,7 @@ async def test_that_relational_resolver_prioritizes_journey_over_guideline(
     # Create priority relationship: journey > standalone guideline
     await relationship_store.create_relationship(
         source=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id),
+            id=Tag.for_journey_id(journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         target=RelationshipEntity(
@@ -332,7 +332,7 @@ async def test_that_relational_resolver_filters_journey_dependent_guideline_when
             kind=RelationshipEntityKind.GUIDELINE,
         ),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id),
+            id=Tag.for_journey_id(journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         kind=RelationshipKind.DEPENDENCY,
@@ -351,7 +351,7 @@ async def test_that_relational_resolver_filters_journey_dependent_guideline_when
             kind=RelationshipEntityKind.GUIDELINE,
         ),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id),
+            id=Tag.for_journey_id(journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         kind=RelationshipKind.PRIORITY,
@@ -435,11 +435,11 @@ async def test_that_relational_resolver_does_not_ignore_deprioritized_journey_no
 
     await relationship_store.create_relationship(
         source=RelationshipEntity(
-            id=Tag.for_journey_id(prioritized_journey.id),
+            id=Tag.for_journey_id(prioritized_journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(deprioritized_journey.id),
+            id=Tag.for_journey_id(deprioritized_journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         kind=RelationshipKind.PRIORITY,
@@ -827,7 +827,7 @@ async def test_that_relational_resolver_filters_out_journey_nodes_with_unmet_jou
 
     await relationship_store.create_relationship(
         source=RelationshipEntity(
-            id=Tag.for_journey_id(source_journey.id),
+            id=Tag.for_journey_id(source_journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         target=RelationshipEntity(
@@ -881,11 +881,11 @@ async def test_that_relational_resolver_filters_out_journey_nodes_with_unmet_jou
 
     await relationship_store.create_relationship(
         source=RelationshipEntity(
-            id=Tag.for_journey_id(source_journey.id),
+            id=Tag.for_journey_id(source_journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(target_journey.id),
+            id=Tag.for_journey_id(target_journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         kind=RelationshipKind.DEPENDENCY,
@@ -937,7 +937,7 @@ async def test_that_relational_resolver_filters_dependent_guidelines_by_journey_
             kind=RelationshipEntityKind.GUIDELINE,
         ),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(enabled_journey.id),
+            id=Tag.for_journey_id(enabled_journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         kind=RelationshipKind.DEPENDENCY,
@@ -949,7 +949,7 @@ async def test_that_relational_resolver_filters_dependent_guidelines_by_journey_
             kind=RelationshipEntityKind.GUIDELINE,
         ),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(disabled_journey.id),
+            id=Tag.for_journey_id(disabled_journey.id).id,
             kind=RelationshipEntityKind.TAG,
         ),
         kind=RelationshipKind.DEPENDENCY,
@@ -1655,13 +1655,13 @@ async def test_that_journey_tag_priority_deprioritizes_all_guidelines_of_target_
     )
 
     # Tag condition guideline with its journey tag (as the real projection does)
-    await guideline_store.upsert_tag(j_cond.id, Tag.for_journey_id(journey.id))
+    await guideline_store.upsert_tag(j_cond.id, Tag.for_journey_id(journey.id).id)
     j_cond = await guideline_store.read_guideline(j_cond.id)
 
     # Journey J prioritizes over t1
     await relationship_store.create_relationship(
         source=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id), kind=RelationshipEntityKind.TAG
+            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG
         ),
         target=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.PRIORITY,
@@ -1712,8 +1712,8 @@ async def test_that_journey_tag_priority_deprioritizes_target_journey_tag(
 
     # J1 prioritizes over J2
     await relationship_store.create_relationship(
-        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
-        target=RelationshipEntity(id=Tag.for_journey_id(j2.id), kind=RelationshipEntityKind.TAG),
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id).id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j2.id).id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.PRIORITY,
     )
 
@@ -1771,7 +1771,7 @@ async def test_that_tag_priority_deprioritizes_target_journey(
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id), kind=RelationshipEntityKind.TAG
+            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG
         ),
         kind=RelationshipKind.PRIORITY,
     )
@@ -1903,7 +1903,7 @@ async def test_that_journey_tag_dependency_deactivates_node_guidelines_when_targ
 
     # j1 depends on t1
     await relationship_store.create_relationship(
-        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id).id, kind=RelationshipEntityKind.TAG),
         target=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.DEPENDENCY,
     )
@@ -1946,7 +1946,7 @@ async def test_that_tag_dependency_deactivates_tagged_guidelines_when_target_jou
     # t1 depends on j1
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
-        target=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j1.id).id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.DEPENDENCY,
     )
 
@@ -1989,8 +1989,8 @@ async def test_that_journey_tag_dependency_deactivates_node_guidelines_when_targ
 
     # j1 depends on j2
     await relationship_store.create_relationship(
-        source=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
-        target=RelationshipEntity(id=Tag.for_journey_id(j2.id), kind=RelationshipEntityKind.TAG),
+        source=RelationshipEntity(id=Tag.for_journey_id(j1.id).id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j2.id).id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.DEPENDENCY,
     )
 
@@ -2033,7 +2033,7 @@ async def test_that_condition_guideline_survives_when_its_journey_is_deprioritiz
     j1_cond = await guideline_store.create_guideline(
         condition="customer is interested",
         action="observe interest",
-        tags=[Tag.for_journey_id(j1.id)],
+        tags=[Tag.for_journey_id(j1.id).id],
     )
 
     j1_node = await guideline_store.create_guideline(
@@ -2050,7 +2050,7 @@ async def test_that_condition_guideline_survives_when_its_journey_is_deprioritiz
     # g1 prioritizes over j1
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=g1.id, kind=RelationshipEntityKind.GUIDELINE),
-        target=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j1.id).id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.PRIORITY,
     )
 

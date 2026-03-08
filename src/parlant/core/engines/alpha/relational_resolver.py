@@ -298,7 +298,7 @@ class RelationalResolver:
                         cache,
                         RelationshipKind.DEPENDENCY,
                         True,
-                        source_id=Tag.for_journey_id(journey_id),
+                        source_id=Tag.for_journey_id(journey_id).id,
                     )
                 )
 
@@ -420,7 +420,7 @@ class RelationalResolver:
                             cache,
                             RelationshipKind.PRIORITY,
                             True,
-                            target_id=Tag.for_journey_id(journey_id),
+                            target_id=Tag.for_journey_id(journey_id).id,
                         )
                     )
 
@@ -549,7 +549,7 @@ class RelationalResolver:
         # Check if any matched guidelines prioritize over active journeys
         result_guideline_ids = {m.guideline.id for m in result}
         for journey in journeys:
-            journey_tag = Tag.for_journey_id(journey.id)
+            journey_tag = Tag.for_journey_id(journey.id).id
             priority_relationships = await self._get_relationships(
                 cache, RelationshipKind.PRIORITY, True, target_id=journey_tag
             )

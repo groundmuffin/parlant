@@ -893,7 +893,7 @@ class Tag:
             entity_target = RelationshipEntity(id=target.id, kind=RelationshipEntityKind.TAG)
         else:
             entity_target = RelationshipEntity(
-                id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
+                id=_Tag.for_journey_id(target.id).id, kind=RelationshipEntityKind.TAG
             )
 
         relationship = await server._container[RelationshipStore].create_relationship(
@@ -1185,7 +1185,7 @@ class Guideline:
             other_entity = RelationshipEntity(id=target.id, kind=RelationshipEntityKind.TAG)
         else:
             other_entity = RelationshipEntity(
-                id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
+                id=_Tag.for_journey_id(target.id).id, kind=RelationshipEntityKind.TAG
             )
 
         self_entity = RelationshipEntity(id=self.id, kind=RelationshipEntityKind.GUIDELINE)
@@ -1302,7 +1302,7 @@ class JourneyState:
             [
                 await self._journey._container[RelationshipStore].create_relationship(
                     source=RelationshipEntity(
-                        id=_Tag.for_journey_node_id(actual_state.id),
+                        id=_Tag.for_journey_node_id(actual_state.id).id,
                         kind=RelationshipEntityKind.TAG,
                     ),
                     target=RelationshipEntity(
@@ -1359,7 +1359,8 @@ class JourneyState:
 
             for canrep_id in canned_responses:
                 await self._journey._container[CannedResponseStore].upsert_tag(
-                    canned_response_id=canrep_id, tag_id=_Tag.for_journey_node_id(actual_state.id)
+                    canned_response_id=canrep_id,
+                    tag_id=_Tag.for_journey_node_id(actual_state.id).id,
                 )
 
         cast(list[JourneyTransition[JourneyState]], self._journey.transitions).append(transition)
@@ -1415,7 +1416,7 @@ class JourneyState:
                 [
                     await self._journey._container[RelationshipStore].create_relationship(
                         source=RelationshipEntity(
-                            id=_Tag.for_journey_node_id(new_state.id),
+                            id=_Tag.for_journey_node_id(new_state.id).id,
                             kind=RelationshipEntityKind.TAG,
                         ),
                         target=RelationshipEntity(
@@ -1455,8 +1456,8 @@ class JourneyState:
                 )
 
             # Copy canned responses from the original state to the new state
-            original_state_tag = _Tag.for_journey_node_id(state.id)
-            new_state_tag = _Tag.for_journey_node_id(new_state.id)
+            original_state_tag = _Tag.for_journey_node_id(state.id).id
+            new_state_tag = _Tag.for_journey_node_id(new_state.id).id
 
             # Get all canned responses associated with the original state
             canned_response_store = self._journey._container[CannedResponseStore]
@@ -2527,7 +2528,7 @@ class Journey:
             on_message=on_message,
             canned_response_field_provider=canned_response_field_provider,
             tags=[t.id for t in tags] if tags else None,
-            relationship_target_tag_id=_Tag.for_journey_id(self.id),
+            relationship_target_tag_id=_Tag.for_journey_id(self.id).id,
             id=id,
             track=track,
             labels=labels,
@@ -2608,7 +2609,7 @@ class Journey:
                 kind=RelationshipEntityKind.GUIDELINE,
             ),
             target=RelationshipEntity(
-                id=_Tag.for_journey_id(self.id),
+                id=_Tag.for_journey_id(self.id).id,
                 kind=RelationshipEntityKind.TAG,
             ),
             kind=RelationshipKind.DEPENDENCY,
@@ -2651,7 +2652,7 @@ class Journey:
 
         canrep = await self._container[CannedResponseStore].create_canned_response(
             value=template,
-            tags=[_Tag.for_journey_id(self.id), *[t.id for t in tags]],
+            tags=[_Tag.for_journey_id(self.id).id, *[t.id for t in tags]],
             fields=[],
             signals=signals,
             metadata=metadata,
@@ -2700,13 +2701,13 @@ class Journey:
     ) -> Relationship:
         if direction == "source":
             entity_source = RelationshipEntity(
-                id=_Tag.for_journey_id(self.id), kind=RelationshipEntityKind.TAG
+                id=_Tag.for_journey_id(self.id).id, kind=RelationshipEntityKind.TAG
             )
             entity_target = (
                 RelationshipEntity(id=target.id, kind=RelationshipEntityKind.GUIDELINE)
                 if isinstance(target, Guideline)
                 else RelationshipEntity(
-                    id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
+                    id=_Tag.for_journey_id(target.id).id, kind=RelationshipEntityKind.TAG
                 )
             )
         else:
@@ -2714,11 +2715,11 @@ class Journey:
                 RelationshipEntity(id=target.id, kind=RelationshipEntityKind.GUIDELINE)
                 if isinstance(target, Guideline)
                 else RelationshipEntity(
-                    id=_Tag.for_journey_id(target.id), kind=RelationshipEntityKind.TAG
+                    id=_Tag.for_journey_id(target.id).id, kind=RelationshipEntityKind.TAG
                 )
             )
             entity_target = RelationshipEntity(
-                id=_Tag.for_journey_id(self.id), kind=RelationshipEntityKind.TAG
+                id=_Tag.for_journey_id(self.id).id, kind=RelationshipEntityKind.TAG
             )
 
         relationship = await self._container[RelationshipStore].create_relationship(
@@ -3096,7 +3097,7 @@ class ExperimentalAgentFeatures:
             title=title,
             description=description,
             signals=signals,
-            tags=[_Tag.for_agent_id(self._agent.id)],
+            tags=[_Tag.for_agent_id(self._agent.id).id],
         )
 
         return Capability(
@@ -3195,7 +3196,7 @@ class Agent:
 
         await self._container[JourneyStore].upsert_tag(
             journey.id,
-            _Tag.for_agent_id(self.id),
+            _Tag.for_agent_id(self.id).id,
         )
 
     async def create_guideline(
@@ -3235,7 +3236,7 @@ class Agent:
             on_match=on_match,
             on_message=on_message,
             canned_response_field_provider=canned_response_field_provider,
-            tags=[_Tag.for_agent_id(self.id), *[t.id for t in tags]],
+            tags=[_Tag.for_agent_id(self.id).id, *[t.id for t in tags]],
             relationship_target_tag_id=None,
             id=id,
             track=track,
@@ -3334,7 +3335,7 @@ class Agent:
 
         canrep = await self._container[CannedResponseStore].create_canned_response(
             value=template,
-            tags=[_Tag.for_agent_id(self.id), *[t.id for t in tags]],
+            tags=[_Tag.for_agent_id(self.id).id, *[t.id for t in tags]],
             fields=[],
             signals=signals,
             metadata=metadata,
@@ -3358,7 +3359,7 @@ class Agent:
             name=name,
             description=description,
             synonyms=synonyms,
-            tags=[_Tag.for_agent_id(self.id)],
+            tags=[_Tag.for_agent_id(self.id).id],
             id=id,
         )
 
@@ -3389,7 +3390,7 @@ class Agent:
             description=description,
             tool_id=ToolId(INTEGRATED_TOOL_SERVICE_NAME, tool.tool.name) if tool else None,
             freshness_rules=freshness_rules,
-            tags=[_Tag.for_agent_id(self.id)],
+            tags=[_Tag.for_agent_id(self.id).id],
         )
 
         return Variable(
@@ -3407,7 +3408,7 @@ class Agent:
         """Lists all variables associated with the agent."""
 
         variables = await self._container[ContextVariableStore].list_variables(
-            tags=[_Tag.for_agent_id(self.id)]
+            tags=[_Tag.for_agent_id(self.id).id]
         )
 
         return [
@@ -3451,7 +3452,7 @@ class Agent:
                 (
                     v
                     for v in await self._container[ContextVariableStore].list_variables(
-                        tags=[_Tag.for_agent_id(self.id)]
+                        tags=[_Tag.for_agent_id(self.id).id]
                     )
                     if v.name == name
                 ),
@@ -4167,7 +4168,7 @@ class Server:
         )
 
         if canned_responses:
-            tag_id = _Tag.for_guideline_id(guideline.id)
+            tag_id = _Tag.for_guideline_id(guideline.id).id
 
             for canrep_id in canned_responses:
                 await self.container[CannedResponseStore].upsert_tag(
@@ -5081,7 +5082,7 @@ class Server:
         for c in condition_guidelines:
             await self._container[GuidelineStore].upsert_tag(
                 guideline_id=c.id,
-                tag_id=_Tag.for_journey_id(journey_id=journey.id),
+                tag_id=_Tag.for_journey_id(journey_id=journey.id).id,
             )
 
         self._add_journey_evaluation(journey)

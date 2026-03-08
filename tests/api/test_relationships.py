@@ -853,7 +853,7 @@ async def test_that_relationships_of_guideline_and_a_journey_can_be_listed(
 
     r1 = await relationship_store.create_relationship(
         source=RelationshipEntity(id=g1.id, kind=RelationshipEntityKind.GUIDELINE),
-        target=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j1.id).id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.DEPENDENCY,
     )
 
@@ -885,7 +885,7 @@ async def test_that_relationships_of_a_journey_can_be_listed(
 
     r1 = await relationship_store.create_relationship(
         source=RelationshipEntity(id=g1.id, kind=RelationshipEntityKind.GUIDELINE),
-        target=RelationshipEntity(id=Tag.for_journey_id(j1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_journey_id(j1.id).id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.DEPENDENCY,
     )
 
@@ -912,7 +912,7 @@ async def test_that_relationships_of_guideline_and_an_agent_can_be_listed(
 
     r1 = await relationship_store.create_relationship(
         source=RelationshipEntity(id=g1.id, kind=RelationshipEntityKind.GUIDELINE),
-        target=RelationshipEntity(id=Tag.for_agent_id(a1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_agent_id(a1.id).id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.DEPENDENCY,
     )
 
@@ -940,7 +940,7 @@ async def test_that_relationships_of_an_agent_can_be_listed(
 
     r1 = await relationship_store.create_relationship(
         source=RelationshipEntity(id=g1.id, kind=RelationshipEntityKind.GUIDELINE),
-        target=RelationshipEntity(id=Tag.for_agent_id(a1.id), kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=Tag.for_agent_id(a1.id).id, kind=RelationshipEntityKind.TAG),
         kind=RelationshipKind.DEPENDENCY,
     )
 

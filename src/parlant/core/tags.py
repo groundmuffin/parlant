@@ -33,6 +33,8 @@ from parlant.core.persistence.document_database_helper import DocumentStoreMigra
 
 TagId = NewType("TagId", str)
 
+_BUILT_IN_TAG_CREATION_TIME = datetime(2025, 1, 1, tzinfo=timezone.utc)
+
 
 @dataclass(frozen=True)
 class Tag:
@@ -45,12 +47,16 @@ class Tag:
         return Tag(
             id=TagId("__preamble__"),
             name="__preamble__",
-            creation_utc=datetime.now(timezone.utc),
+            creation_utc=_BUILT_IN_TAG_CREATION_TIME,
         )
 
     @staticmethod
-    def for_agent_id(agent_id: str) -> TagId:
-        return TagId(f"agent:{agent_id}")
+    def for_agent_id(agent_id: str) -> Tag:
+        return Tag(
+            id=TagId(f"agent:{agent_id}"),
+            name=f"agent:{agent_id}",
+            creation_utc=_BUILT_IN_TAG_CREATION_TIME,
+        )
 
     @staticmethod
     def extract_agent_id(tag_id: TagId) -> Optional[str]:
@@ -60,8 +66,12 @@ class Tag:
         return str(tag_id.split(":")[1])
 
     @staticmethod
-    def for_journey_id(journey_id: str) -> TagId:
-        return TagId(f"journey:{journey_id}")
+    def for_journey_id(journey_id: str) -> Tag:
+        return Tag(
+            id=TagId(f"journey:{journey_id}"),
+            name=f"journey:{journey_id}",
+            creation_utc=_BUILT_IN_TAG_CREATION_TIME,
+        )
 
     @staticmethod
     def extract_journey_id(tag_id: TagId) -> Optional[str]:
@@ -71,8 +81,12 @@ class Tag:
         return str(tag_id.split(":")[1])
 
     @staticmethod
-    def for_journey_node_id(journey_node_id: str) -> TagId:
-        return TagId(f"journey_node:{journey_node_id}")
+    def for_journey_node_id(journey_node_id: str) -> Tag:
+        return Tag(
+            id=TagId(f"journey_node:{journey_node_id}"),
+            name=f"journey_node:{journey_node_id}",
+            creation_utc=_BUILT_IN_TAG_CREATION_TIME,
+        )
 
     @staticmethod
     def extract_journey_node_id(tag_id: TagId) -> Optional[str]:
@@ -82,8 +96,12 @@ class Tag:
         return str(tag_id.split(":")[1])
 
     @staticmethod
-    def for_guideline_id(guideline_id: str) -> TagId:
-        return TagId(f"guideline:{guideline_id}")
+    def for_guideline_id(guideline_id: str) -> Tag:
+        return Tag(
+            id=TagId(f"guideline:{guideline_id}"),
+            name=f"guideline:{guideline_id}",
+            creation_utc=_BUILT_IN_TAG_CREATION_TIME,
+        )
 
     @staticmethod
     def extract_guideline_id(tag_id: TagId) -> Optional[str]:

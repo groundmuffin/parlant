@@ -110,7 +110,7 @@ async def test_that_guideline_with_not_hierarchy_tag_is_not_returned(
 
     await guideline_store.upsert_tag(
         guideline_id=first_guideline.id,
-        tag_id=Tag.for_agent_id(agent.id),
+        tag_id=Tag.for_agent_id(agent.id).id,
     )
 
     await guideline_store.upsert_tag(
@@ -148,12 +148,12 @@ async def test_that_guideline_matches_are_not_filtered_by_enabled_journeys(
 
     await guideline_store.upsert_tag(
         guideline_id=journey_guideline.id,
-        tag_id=Tag.for_journey_id(journey.id),
+        tag_id=Tag.for_journey_id(journey.id).id,
     )
 
     await guideline_store.upsert_tag(
         guideline_id=guideline.id,
-        tag_id=Tag.for_journey_id(journey.id),
+        tag_id=Tag.for_journey_id(journey.id).id,
     )
 
     result = await entity_queries.find_guidelines_for_context(
@@ -190,12 +190,12 @@ async def test_that_guideline_tagged_with_disabled_journey_is_filtered_out_when_
 
     await guideline_store.upsert_tag(
         guideline_id=journey_guideline.id,
-        tag_id=Tag.for_journey_id(journey.id),
+        tag_id=Tag.for_journey_id(journey.id).id,
     )
 
     await guideline_store.upsert_tag(
         guideline_id=guideline.id,
-        tag_id=Tag.for_journey_id(journey.id),
+        tag_id=Tag.for_journey_id(journey.id).id,
     )
 
     result = await entity_queries.find_guidelines_for_context(
@@ -263,7 +263,7 @@ async def test_that_find_canned_responses_for_agent_and_journey_returns_journey_
         conditions=[],
     )
 
-    journey_tag = Tag.for_journey_id(journey.id)
+    journey_tag = Tag.for_journey_id(journey.id).id
     journey_canrep = await canrep_store.create_canned_response(
         value="Journey canrep",
         fields=[],
@@ -423,7 +423,7 @@ async def test_list_guidelines_dependent_directly_on_journey(
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=guideline1.id, kind=RelationshipEntityKind.GUIDELINE),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id), kind=RelationshipEntityKind.TAG
+            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG
         ),
         kind=RelationshipKind.DEPENDENCY,
     )
@@ -467,7 +467,7 @@ async def test_list_guidelines_dependent_indirectly_on_journey(
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=guideline1.id, kind=RelationshipEntityKind.GUIDELINE),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id), kind=RelationshipEntityKind.TAG
+            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG
         ),
         kind=RelationshipKind.DEPENDENCY,
     )
@@ -486,7 +486,7 @@ async def test_list_guidelines_dependent_indirectly_on_journey(
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=tag.id, kind=RelationshipEntityKind.TAG),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id), kind=RelationshipEntityKind.TAG
+            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG
         ),
         kind=RelationshipKind.DEPENDENCY,
     )
@@ -566,17 +566,17 @@ async def test_that_canned_responses_can_be_found_for_a_guideline(
 
     await canned_response_store.upsert_tag(
         canned_response_id=canrep_1.id,
-        tag_id=Tag.for_guideline_id(g1.id),
+        tag_id=Tag.for_guideline_id(g1.id).id,
     )
 
     await canned_response_store.upsert_tag(
         canned_response_id=canrep_2.id,
-        tag_id=Tag.for_guideline_id(g2.id),
+        tag_id=Tag.for_guideline_id(g2.id).id,
     )
 
     await canned_response_store.upsert_tag(
         canned_response_id=canrep_4.id,
-        tag_id=Tag.for_journey_node_id(node.id),
+        tag_id=Tag.for_journey_node_id(node.id).id,
     )
 
     results = await entity_queries.find_canned_responses_for_guidelines(

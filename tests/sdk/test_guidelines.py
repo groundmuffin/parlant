@@ -254,7 +254,7 @@ class Test_that_guideline_can_depend_on_journey(SDKTest):
 
         assert relationship.kind == RelationshipKind.DEPENDENCY
         assert relationship.source.id == self.guideline.id
-        assert relationship.target.id == Tag.for_journey_id(self.journey.id)
+        assert relationship.target.id == Tag.for_journey_id(self.journey.id).id
 
 
 class Test_that_guideline_can_be_created_with_inline_dependencies(SDKTest):
@@ -344,7 +344,7 @@ class Test_that_agent_guideline_can_be_created_with_canned_responses(SDKTest):
     async def run(self, ctx: Context) -> None:
         canrep_store = ctx.container[CannedResponseStore]
 
-        guideline_tag = Tag.for_guideline_id(self.guideline.id)
+        guideline_tag = Tag.for_guideline_id(self.guideline.id).id
 
         updated_canrep1 = await canrep_store.read_canned_response(self.canrep1)
         updated_canrep2 = await canrep_store.read_canned_response(self.canrep2)
@@ -374,7 +374,7 @@ class Test_that_agent_observation_can_be_created_with_canned_responses(SDKTest):
 
         updated_canrep = await canrep_store.read_canned_response(self.canrep)
 
-        assert Tag.for_guideline_id(self.observation.id) in updated_canrep.tags
+        assert Tag.for_guideline_id(self.observation.id).id in updated_canrep.tags
 
 
 class Test_that_agent_guideline_can_be_created_with_metadata(SDKTest):

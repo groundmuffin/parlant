@@ -121,7 +121,7 @@ class EntityQueries:
         journeys: Sequence[Journey],
     ) -> Sequence[Guideline]:
         agent_guidelines = await self._guideline_store.list_guidelines(
-            tags=[Tag.for_agent_id(agent_id)],
+            tags=[Tag.for_agent_id(agent_id).id],
         )
         global_guidelines = await self._guideline_store.list_guidelines(tags=[])
 
@@ -131,7 +131,7 @@ class EntityQueries:
         )
 
         guidelines_for_journeys = await self._guideline_store.list_guidelines(
-            tags=[Tag.for_journey_id(journey.id) for journey in journeys]
+            tags=[Tag.for_journey_id(journey.id).id for journey in journeys]
         )
 
         tasks = [
@@ -166,7 +166,7 @@ class EntityQueries:
             await self._relationship_store.list_relationships(
                 kind=RelationshipKind.DEPENDENCY,
                 indirect=False,
-                target_id=Tag.for_journey_id(journey.id),
+                target_id=Tag.for_journey_id(journey.id).id,
             )
         )
 
@@ -211,7 +211,7 @@ class EntityQueries:
         agent_id: AgentId,
     ) -> Sequence[ContextVariable]:
         agent_context_variables = await self._context_variable_store.list_variables(
-            tags=[Tag.for_agent_id(agent_id)],
+            tags=[Tag.for_agent_id(agent_id).id],
         )
         global_context_variables = await self._context_variable_store.list_variables(tags=[])
         agent = await self._agent_store.read_agent(agent_id)
@@ -259,7 +259,7 @@ class EntityQueries:
         max_count: int,
     ) -> Sequence[Capability]:
         agent_capabilities = await self._capability_store.list_capabilities(
-            tags=[Tag.for_agent_id(agent_id)],
+            tags=[Tag.for_agent_id(agent_id).id],
         )
         global_capabilities = await self._capability_store.list_capabilities(tags=[])
         agent = await self._agent_store.read_agent(agent_id)
@@ -289,7 +289,7 @@ class EntityQueries:
         query: str,
     ) -> Sequence[Term]:
         agent_terms = await self._glossary_store.list_terms(
-            tags=[Tag.for_agent_id(agent_id)],
+            tags=[Tag.for_agent_id(agent_id).id],
         )
         global_terms = await self._glossary_store.list_terms(tags=[])
         agent = await self._agent_store.read_agent(agent_id)
@@ -312,7 +312,7 @@ class EntityQueries:
         agent_id: AgentId,
     ) -> Sequence[Journey]:
         agent_journeys = await self._journey_store.list_journeys(
-            tags=[Tag.for_agent_id(agent_id)],
+            tags=[Tag.for_agent_id(agent_id).id],
         )
         global_journeys = await self._journey_store.list_journeys(tags=[])
 
@@ -343,7 +343,7 @@ class EntityQueries:
         guidelines: Sequence[Guideline],
     ) -> Sequence[CannedResponse]:
         agent_canreps = await self._canned_response_store.list_canned_responses(
-            tags=[Tag.for_agent_id(agent.id)],
+            tags=[Tag.for_agent_id(agent.id).id],
         )
         global_canreps = await self._canned_response_store.list_canned_responses(tags=[])
 
@@ -352,7 +352,7 @@ class EntityQueries:
         )
 
         journey_canreps = await self._canned_response_store.list_canned_responses(
-            tags=[Tag.for_journey_id(journey.id) for journey in journeys]
+            tags=[Tag.for_journey_id(journey.id).id for journey in journeys]
         )
 
         guideline_canreps = await self.find_canned_responses_for_guidelines(guidelines)
@@ -378,11 +378,11 @@ class EntityQueries:
         for g in guidelines:
             if g.id.startswith("journey_node:"):
                 tags.append(
-                    Tag.for_journey_node_id(extract_node_id_from_journey_node_guideline_id(g.id))
+                    Tag.for_journey_node_id(extract_node_id_from_journey_node_guideline_id(g.id)).id
                 )
 
             else:
-                tags.append(Tag.for_guideline_id(g.id))
+                tags.append(Tag.for_guideline_id(g.id).id)
 
         return await self._canned_response_store.list_canned_responses(tags=tags)
 
