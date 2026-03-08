@@ -279,6 +279,12 @@ class RelationalResolver:
         # This is the logic from filter_unmet_dependencies in the old implementation
         matched_guideline_ids = {m.guideline.id for m in matches}
 
+        # Build a map of tag → matched guideline IDs for non-persisted guidelines
+        matched_tag_guidelines: dict[TagId, set[GuidelineId]] = defaultdict(set)
+        for m in matches:
+            for tag_id in m.guideline.tags:
+                matched_tag_guidelines[tag_id].add(m.guideline.id)
+
         result: list[GuidelineMatch] = []
 
         for match in matches:
@@ -338,19 +344,25 @@ class RelationalResolver:
                         tags=[cast(TagId, dependency.target.id)]
                     )
 
-                    for g in guidelines_associated_to_tag:
-                        if g.id not in matched_guideline_ids:
+                    # Merge store results with matched (possibly non-persisted) guidelines
+                    all_guideline_ids_for_tag = {g.id for g in guidelines_associated_to_tag}
+                    all_guideline_ids_for_tag.update(
+                        matched_tag_guidelines.get(cast(TagId, dependency.target.id), set())
+                    )
+
+                    for gid in all_guideline_ids_for_tag:
+                        if gid not in matched_guideline_ids:
                             dependent_on_inactive_guidelines = True
                             break
 
-                        if g.id not in iterated_guidelines:
+                        if gid not in iterated_guidelines:
                             dependencies.extend(
                                 await self._get_relationships(
-                                    cache, RelationshipKind.DEPENDENCY, True, source_id=g.id
+                                    cache, RelationshipKind.DEPENDENCY, True, source_id=gid
                                 )
                             )
 
-                    iterated_guidelines.update(g.id for g in guidelines_associated_to_tag)
+                    iterated_guidelines.update(all_guideline_ids_for_tag)
 
                     if dependent_on_inactive_guidelines:
                         break
@@ -377,6 +389,12 @@ class RelationalResolver:
         """Apply priority relationships and filter both matches and journeys."""
         # This is the logic from replace_with_prioritized in the old implementation
         match_guideline_ids = {m.guideline.id for m in matches}
+
+        # Build a map of tag → matched guideline IDs for non-persisted guidelines
+        matched_tag_guidelines: dict[TagId, set[GuidelineId]] = defaultdict(set)
+        for m in matches:
+            for tag_id in m.guideline.tags:
+                matched_tag_guidelines[tag_id].add(m.guideline.id)
 
         iterated_guidelines: set[GuidelineId] = set()
 
@@ -457,6 +475,21 @@ class RelationalResolver:
                     ):
                         deprioritized = True
                         break
+
+                    # Also check matched guidelines for the tag (handles projected/non-persisted guidelines)
+                    if not deprioritized:
+                        if prioritized_guideline_id := next(
+                            (
+                                gid
+                                for gid in matched_tag_guidelines.get(
+                                    cast(TagId, prioritized_entity.id), set()
+                                )
+                                if gid != match.guideline.id
+                            ),
+                            None,
+                        ):
+                            deprioritized = True
+                            break
 
                     for g in guideline_associated_with_prioritized_tag:
                         if g.id in iterated_guidelines or g.id in match_guideline_ids:

@@ -565,6 +565,94 @@ class Test_that_journey_can_take_priority_over_a_guideline(SDKTest):
         )
 
 
+class Test_that_tagged_journey_takes_priority_over_a_guideline_via_tag_relationship(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Test Agent",
+            description="",
+        )
+
+        t1 = await server.create_tag("t1")
+
+        # Guideline that matches when customer is thirsty
+        self.guideline = await self.agent.create_guideline(
+            condition="Customer is thirsty",
+            action="Offer a banana smoothie",
+        )
+
+        # Journey tagged with t1 that also matches when customer is thirsty
+        self.journey = await self.agent.create_journey(
+            title="Drink Recommendation Journey",
+            conditions=["Customer is thirsty"],
+            description="",
+            tags=[t1],
+        )
+
+        # Use transition_to to create node guidelines (which carry journey's custom tags)
+        await self.journey.initial_state.transition_to(
+            chat_state="Offer a Pepsi to the customer",
+        )
+
+        # t1 (journey's custom tag) prioritizes over the standalone guideline
+        await t1.prioritize_over(self.guideline)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="I'm thirsty",
+            recipient=self.agent,
+        )
+
+        # Journey's recommendation should apply
+        assert "pepsi" in response.lower(), f"Expected 'Pepsi' in response: {response}"
+        # Guideline's recommendation should NOT apply
+        assert "banana" not in response.lower(), f"Did not expect 'Banana' in response: {response}"
+
+
+class Test_that_tagged_journey_takes_priority_over_a_guideline_via_tag_to_tag_relationship(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Test Agent",
+            description="",
+        )
+
+        t1 = await server.create_tag("t1")
+        t2 = await server.create_tag("t2")
+
+        # Guideline that matches when customer is thirsty
+        self.guideline = await self.agent.create_guideline(
+            condition="Customer is thirsty",
+            action="Offer a banana smoothie",
+            tags=[t2],
+        )
+
+        # Journey tagged with t1 that also matches when customer is thirsty
+        self.journey = await self.agent.create_journey(
+            title="Drink Recommendation Journey",
+            conditions=["Customer is thirsty"],
+            description="",
+            tags=[t1],
+        )
+
+        # Use transition_to to create node guidelines (which carry journey's custom tags)
+        await self.journey.initial_state.transition_to(
+            chat_state="Offer a Pepsi to the customer",
+        )
+
+        # t1 (journey's custom tag) prioritizes over the standalone guideline
+        await t1.prioritize_over(t2)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="I'm thirsty",
+            recipient=self.agent,
+        )
+
+        # Journey's recommendation should apply
+        assert "pepsi" in response.lower(), f"Expected 'Pepsi' in response: {response}"
+        # Guideline's recommendation should NOT apply
+        assert "banana" not in response.lower(), f"Did not expect 'Banana' in response: {response}"
+
+
 class Test_that_journey_can_depend_on_a_guideline(SDKTest):
     async def setup(self, server: p.Server) -> None:
         self.agent = await server.create_agent(

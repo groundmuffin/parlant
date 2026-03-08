@@ -1621,7 +1621,7 @@ async def test_that_tag_priority_deprioritizes_all_guidelines_of_target_tag(
     assert result_ids == {g1_1.id, g1_2.id}
 
 
-async def test_that_journey_priority_deprioritizes_all_guidelines_of_target_tag(
+async def test_that_journey_tag_priority_deprioritizes_all_guidelines_of_target_tag(
     container: Container,
 ) -> None:
     """
@@ -1681,7 +1681,7 @@ async def test_that_journey_priority_deprioritizes_all_guidelines_of_target_tag(
     assert result_ids == {j_cond.id}
 
 
-async def test_that_journey_priority_deprioritizes_target_journey(
+async def test_that_journey_tag_priority_deprioritizes_target_journey_tag(
     container: Container,
 ) -> None:
     """
@@ -1874,7 +1874,7 @@ async def test_that_tag_dependency_deactivates_tagged_guidelines_when_target_tag
     assert result_ids == {g3.id}
 
 
-async def test_that_journey_dependency_deactivates_node_guidelines_when_target_tag_not_met(
+async def test_that_journey_tag_dependency_deactivates_node_guidelines_when_target_tag_not_met(
     container: Container,
 ) -> None:
     """
@@ -1963,7 +1963,7 @@ async def test_that_tag_dependency_deactivates_tagged_guidelines_when_target_jou
     assert result_ids == {g_extra.id}
 
 
-async def test_that_journey_dependency_deactivates_node_guidelines_when_target_journey_not_active(
+async def test_that_journey_tag_dependency_deactivates_node_guidelines_when_target_journey_tag_not_active(
     container: Container,
 ) -> None:
     """
@@ -2204,3 +2204,211 @@ async def test_that_tag_priority_transitively_filters_guideline_depending_on_dep
 
     result_ids = {m.guideline.id for m in result.matches}
     assert result_ids == {g1_1.id}
+
+
+# ── Custom journey tag propagation tests ───────────────────────────────────
+
+
+async def test_that_custom_tagged_journey_deprioritizes_guidelines_with_lower_priority_tag(
+    container: Container,
+) -> None:
+    """
+    Journey with custom tag t1, standalone guideline with t2, relationship t1 > t2.
+    Node guideline (with journey_node metadata and tags=[t1]) and t2-tagged guideline
+    both match → only node guideline survives.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+
+    # Node guideline carrying the journey's custom tag
+    j1_node = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 node action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t1.id],
+    )
+
+    # Standalone guideline tagged t2
+    g1 = await guideline_store.create_guideline(condition="b", action="g1 action", tags=[t2.id])
+
+    # t1 prioritizes over t2
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [j1_node, g1],
+        [
+            GuidelineMatch(guideline=j1_node, score=10, rationale=""),
+            GuidelineMatch(guideline=g1, score=10, rationale=""),
+        ],
+        journeys=[j1],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {j1_node.id}
+
+
+async def test_that_higher_priority_tag_deprioritizes_journey_with_matching_custom_tag(
+    container: Container,
+) -> None:
+    """
+    Standalone guideline with tag t2, journey node guideline with custom tag t1,
+    relationship t2 > t1. Both match → node guideline is deprioritized.
+    Result: only t2-tagged guidelines survive.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+
+    # Node guideline carrying the journey's custom tag
+    j1_node = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 node action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t1.id],
+    )
+
+    # Standalone guideline tagged t2
+    g1 = await guideline_store.create_guideline(condition="b", action="g1 action", tags=[t2.id])
+
+    # t2 prioritizes over t1
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [j1_node, g1],
+        [
+            GuidelineMatch(guideline=j1_node, score=10, rationale=""),
+            GuidelineMatch(guideline=g1, score=10, rationale=""),
+        ],
+        journeys=[j1],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g1.id}
+
+
+async def test_that_custom_tagged_journey_dependency_deactivates_node_guidelines_when_target_tag_not_met(
+    container: Container,
+) -> None:
+    """
+    Journey with custom tag t1, relationship t1 depends on t2.
+    t2-tagged guideline NOT matched → node guideline deactivated.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+
+    # Node guideline carrying the journey's custom tag
+    j1_node = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 node action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t1.id],
+    )
+
+    # Standalone guideline tagged t2 (will NOT be matched)
+    g1 = await guideline_store.create_guideline(condition="b", action="g1 action", tags=[t2.id])
+
+    g_extra = await guideline_store.create_guideline(condition="c", action="extra action")
+
+    # t1 depends on t2
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [j1_node, g1, g_extra],
+        [
+            GuidelineMatch(guideline=j1_node, score=10, rationale=""),
+            # g1 NOT matched
+            GuidelineMatch(guideline=g_extra, score=10, rationale=""),
+        ],
+        journeys=[j1],
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g_extra.id}
+
+
+async def test_that_tag_dependency_on_custom_tagged_journey_deactivates_when_journey_not_active(
+    container: Container,
+) -> None:
+    """
+    Standalone guideline with t2, relationship t2 depends on t1.
+    Journey with custom tag t1 not active (no node guidelines matched).
+    Result: t2-tagged guideline deactivated.
+    """
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    tag_store = container[TagStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    t1 = await tag_store.create_tag(name="t1")
+    t2 = await tag_store.create_tag(name="t2")
+
+    j1 = await journey_store.create_journey(title="J1", description="Journey 1", conditions=[])
+
+    # Node guideline carrying the journey's custom tag (will NOT be matched)
+    j1_node = await guideline_store.create_guideline(
+        condition="a",
+        action="j1 node action",
+        metadata={"journey_node": {"journey_id": j1.id}},
+        tags=[t1.id],
+    )
+
+    # Standalone guideline tagged t2
+    g1 = await guideline_store.create_guideline(condition="b", action="g1 action", tags=[t2.id])
+
+    g_extra = await guideline_store.create_guideline(condition="c", action="extra action")
+
+    # t2 depends on t1
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=t2.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=t1.id, kind=RelationshipEntityKind.TAG),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    result = await resolver.resolve(
+        [j1_node, g1, g_extra],
+        [
+            # j1_node NOT matched (journey not active)
+            GuidelineMatch(guideline=g1, score=10, rationale=""),
+            GuidelineMatch(guideline=g_extra, score=10, rationale=""),
+        ],
+        journeys=[],  # j1 NOT active
+    )
+
+    result_ids = {m.guideline.id for m in result.matches}
+    assert result_ids == {g_extra.id}
