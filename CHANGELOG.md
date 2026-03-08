@@ -23,10 +23,15 @@ All notable changes to Parlant will be documented here.
 - Add `Customer.update()` and `CustomerMetadata` to the SDK, allowing tools to update customer name and metadata
 - Add `Session.update()`, `SessionMetadata`, and `SessionLabels` to the SDK, allowing tools to update session properties, metadata, and labels
 - Add `customer`, `agent`, `mode`, and `title` properties to SDK `Session` class
+- Add `Server.get_tag()` to the SDK, supporting lookup by either `id` or `name`
+- Add name-based filtering to `TagStore.list_tags()` and the `GET /tags` API endpoint via an optional `name` query parameter
+- Enforce tag name uniqueness in `TagStore`, raising an error when creating a tag with a duplicate name
+
 ### Changed
 
 - Change `reevaluate_after()` on `Tag` and `Guideline` to accept multiple tools (`*tools`) and return `Sequence[Relationship]`
 - Change `tags` field type from `Sequence[TagId]` to `Sequence[Tag]` on `Guideline`, `Journey`, `Capability`, `Term`, `Variable`, `Customer`, and `Agent` in the SDK
+- Change `Tag.preamble()` to return a full `Tag` object instead of a `TagId`
 - Rename `ToolProvidedGuideline` to `TransientGuideline` across the codebase
 - Upgrade MCP service and bump dependency versions to resolve security vulnerabilities
 

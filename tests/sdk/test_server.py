@@ -15,6 +15,7 @@
 from typing import Awaitable, Callable
 from fastapi import FastAPI, Request, Response
 import httpx
+import pytest
 
 import parlant.sdk as p
 
@@ -138,6 +139,53 @@ class Test_that_configure_api_can_add_middleware(SDKTest):
             assert "X-Custom-Header" in response.headers
             assert response.headers["X-Custom-Header"] == "test-value"
             assert self.middleware_was_called
+
+
+class Test_that_get_tag_returns_tag_by_id(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.tag = await server.create_tag("test-tag")
+
+    async def run(self, ctx: Context) -> None:
+        retrieved = await ctx.server.get_tag(id=self.tag.id)
+        assert retrieved.id == self.tag.id
+        assert retrieved.name == self.tag.name
+
+
+class Test_that_get_tag_returns_tag_by_name(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.tag = await server.create_tag("test-tag")
+
+    async def run(self, ctx: Context) -> None:
+        retrieved = await ctx.server.get_tag(name="test-tag")
+        assert retrieved.id == self.tag.id
+        assert retrieved.name == self.tag.name
+
+
+class Test_that_get_tag_raises_when_both_id_and_name_are_provided(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.tag = await server.create_tag("test-tag")
+
+    async def run(self, ctx: Context) -> None:
+        with pytest.raises(p.SDKError):
+            await ctx.server.get_tag(id=self.tag.id, name="test-tag")
+
+
+class Test_that_get_tag_raises_when_name_does_not_exist(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        pass
+
+    async def run(self, ctx: Context) -> None:
+        with pytest.raises(p.SDKError, match="not found"):
+            await ctx.server.get_tag(name="nonexistent")
+
+
+class Test_that_get_tag_raises_when_neither_id_nor_name_is_provided(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        pass
+
+    async def run(self, ctx: Context) -> None:
+        with pytest.raises(p.SDKError):
+            await ctx.server.get_tag()
 
 
 class Test_that_server_works_without_configure_api(SDKTest):

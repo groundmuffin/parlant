@@ -189,7 +189,7 @@ class BasicPerceivedPerformancePolicy(PerceivedPerformancePolicy):
 
         message_data = cast(MessageEventData, last_agent_message.data)
 
-        return Tag.preamble() in message_data.get("tags", [])
+        return Tag.preamble().id in message_data.get("tags", [])
 
     def _calculate_previous_customer_wait_times(self, context: EngineContext) -> list[float]:
         result = []

@@ -830,8 +830,9 @@ class Tag:
     """A tag used to categorize and link entities."""
 
     @staticmethod
-    def preamble() -> TagId:
-        return _Tag.preamble()
+    def preamble() -> Tag:
+        core_tag = _Tag.preamble()
+        return Tag(id=core_tag.id, name=core_tag.name)
 
     id: TagId
     name: str
@@ -2639,7 +2640,7 @@ class Journey:
     async def create_canned_response(
         self,
         template: str,
-        tags: list[TagId] = [],
+        tags: list[Tag] = [],
         signals: list[str] = [],
         metadata: Mapping[str, JSONSerializable] = {},
         field_dependencies: Sequence[str] = (),
@@ -2650,7 +2651,7 @@ class Journey:
 
         canrep = await self._container[CannedResponseStore].create_canned_response(
             value=template,
-            tags=[_Tag.for_journey_id(self.id), *tags],
+            tags=[_Tag.for_journey_id(self.id), *[t.id for t in tags]],
             fields=[],
             signals=signals,
             metadata=metadata,
@@ -3322,7 +3323,7 @@ class Agent:
     async def create_canned_response(
         self,
         template: str,
-        tags: list[TagId] = [],
+        tags: list[Tag] = [],
         signals: list[str] = [],
         metadata: Mapping[str, JSONSerializable] = {},
         field_dependencies: Sequence[str] = (),
@@ -3333,7 +3334,7 @@ class Agent:
 
         canrep = await self._container[CannedResponseStore].create_canned_response(
             value=template,
-            tags=[_Tag.for_agent_id(self.id), *tags],
+            tags=[_Tag.for_agent_id(self.id), *[t.id for t in tags]],
             fields=[],
             signals=signals,
             metadata=metadata,
@@ -4719,6 +4720,30 @@ class Server:
             for retriever_id, retriever in self._retrievers[agent].items():
                 await setup_retriever(self._container, agent, retriever_id, retriever)
 
+    async def get_tag(
+        self,
+        *,
+        id: TagId | None = None,
+        name: str | None = None,
+    ) -> Tag:
+        if (id is None) == (name is None):
+            raise SDKError("Exactly one of 'id' or 'name' must be provided.")
+
+        if id is not None:
+            tag = await self._container[TagStore].read_tag(tag_id=id)
+        else:
+            assert name is not None
+            tags = await self._container[TagStore].list_tags(name=name)
+            if not tags:
+                raise SDKError(f"Tag with name '{name}' not found.")
+            tag = tags[0]
+
+        return Tag(
+            id=tag.id,
+            name=tag.name,
+            _server=self,
+        )
+
     async def create_tag(self, name: str) -> Tag:
         self._advance_creation_progress()
 
@@ -5083,7 +5108,7 @@ class Server:
     async def create_canned_response(
         self,
         template: str,
-        tags: list[TagId] = [],
+        tags: list[Tag] = [],
         signals: list[str] = [],
         metadata: Mapping[str, JSONSerializable] = {},
         field_dependencies: Sequence[str] = (),
@@ -5094,7 +5119,7 @@ class Server:
 
         canrep = await self._container[CannedResponseStore].create_canned_response(
             value=template,
-            tags=tags,
+            tags=[t.id for t in tags],
             fields=[],
             signals=signals,
             metadata=metadata,

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -21,7 +22,7 @@ from typing_extensions import override, TypedDict, Self
 
 from parlant.core.async_utils import ReaderWriterLock
 from parlant.core.common import ItemNotFoundError, IdGenerator, UniqueId
-from parlant.core.persistence.common import ObjectId
+from parlant.core.persistence.common import ObjectId, Where
 from parlant.core.persistence.document_database import (
     BaseDocument,
     DocumentCollection,
@@ -40,8 +41,12 @@ class Tag:
     name: str
 
     @staticmethod
-    def preamble() -> TagId:
-        return TagId("__preamble__")
+    def preamble() -> Tag:
+        return Tag(
+            id=TagId("__preamble__"),
+            name="__preamble__",
+            creation_utc=datetime.now(timezone.utc),
+        )
 
     @staticmethod
     def for_agent_id(agent_id: str) -> TagId:
@@ -116,6 +121,7 @@ class TagStore(ABC):
     @abstractmethod
     async def list_tags(
         self,
+        name: Optional[str] = None,
     ) -> Sequence[Tag]: ...
 
     @abstractmethod
@@ -200,6 +206,10 @@ class TagDocumentStore(TagStore):
         creation_utc: Optional[datetime] = None,
     ) -> Tag:
         async with self._lock.writer_lock:
+            existing = await self._collection.find({"name": {"$eq": name}})
+            if existing:
+                raise ValueError(f"Tag with name '{name}' already exists")
+
             creation_utc = creation_utc or datetime.now(timezone.utc)
 
             tag_checksum = f"{name}"
@@ -250,9 +260,15 @@ class TagDocumentStore(TagStore):
     @override
     async def list_tags(
         self,
+        name: Optional[str] = None,
     ) -> Sequence[Tag]:
+        filters: Where = {}
+
+        if name is not None:
+            filters = {"name": {"$eq": name}}
+
         async with self._lock.reader_lock:
-            return [self._deserialize(doc) for doc in await self._collection.find({})]
+            return [self._deserialize(doc) for doc in await self._collection.find(filters)]
 
     @override
     async def delete_tag(
