@@ -866,8 +866,12 @@ class JourneyVectorStore(JourneyStore):
         if not journey_doc:
             raise ItemNotFoundError(item_id=UniqueId(journey_id))
 
-        node_docs = await self._node_association_collection.find({"journey_id": {"$eq": journey_id}})
-        edge_docs = await self._edge_association_collection.find({"journey_id": {"$eq": journey_id}})
+        node_docs = await self._node_association_collection.find(
+            {"journey_id": {"$eq": journey_id}}
+        )
+        edge_docs = await self._edge_association_collection.find(
+            {"journey_id": {"$eq": journey_id}}
+        )
 
         content = self.assemble_content(
             title=journey_doc["title"],

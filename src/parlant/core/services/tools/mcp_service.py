@@ -344,7 +344,9 @@ def mcp_result_to_tool_result_data(result: Any) -> Any:
     if structured_content is not None:
         return structured_content
 
-    text_blocks = [content.text for content in getattr(result, "content", []) if content.type == "text"]
+    text_blocks = [
+        content.text for content in getattr(result, "content", []) if content.type == "text"
+    ]
 
     if not text_blocks:
         return None
