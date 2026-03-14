@@ -16,10 +16,7 @@ def _stub_embedder(store: CapabilityStore) -> None:
         hints: Mapping[str, Any] = {},
     ) -> EmbeddingResult:
         return EmbeddingResult(
-            vectors=[
-                [float((len(text) + i) % 13) for i in range(dimensions)]
-                for text in texts
-            ]
+            vectors=[[float((len(text) + i) % 13) for i in range(dimensions)] for text in texts]
         )
 
     store._vector_collection._embedder.embed = embed  # type: ignore[attr-defined, method-assign]

@@ -379,7 +379,9 @@ async def test_that_updating_an_mcp_service_closes_the_previous_client_connectio
 
         assert first_service._client.is_connected()
 
-        async with MCPToolServer([tool_with_date_and_float], port=get_random_port()) as second_server:
+        async with MCPToolServer(
+            [tool_with_date_and_float], port=get_random_port()
+        ) as second_server:
             second_service = await service_registry.update_tool_service(
                 name="my_mcp_service",
                 kind="mcp",
