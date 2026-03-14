@@ -16,7 +16,7 @@ from datetime import datetime, date, timedelta, timezone
 from enum import Enum
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from mcp.types import CallToolResult, TextContent, Tool as McpTool
 from parlant.core.services.tools.mcp_service import (
@@ -61,7 +61,7 @@ class StubMCPClient:
 
 def create_stubbed_tool_client(result: CallToolResult) -> MCPToolClient:
     client = object.__new__(MCPToolClient)
-    client._client = StubMCPClient(result)  # type: ignore[attr-defined]
+    client._client = StubMCPClient(result)  # type: ignore[assignment,attr-defined]
 
     async def read_tool(name: str) -> Tool:
         return Tool(
@@ -377,7 +377,7 @@ async def test_that_updating_an_mcp_service_closes_the_previous_client_connectio
             url=f"{SERVER_BASE_URL}:{first_server.get_port()}",
         )
 
-        assert first_service._client.is_connected()
+        assert cast(MCPToolClient, first_service)._client.is_connected()
 
         async with MCPToolServer(
             [tool_with_date_and_float], port=get_random_port()
@@ -388,5 +388,5 @@ async def test_that_updating_an_mcp_service_closes_the_previous_client_connectio
                 url=f"{SERVER_BASE_URL}:{second_server.get_port()}",
             )
 
-            assert not first_service._client.is_connected()
-            assert second_service._client.is_connected()
+            assert not cast(MCPToolClient, first_service)._client.is_connected()
+            assert cast(MCPToolClient, second_service)._client.is_connected()

@@ -20,7 +20,7 @@ import json
 from mailbox import FormatError
 from mcp.types import Tool as McpTool
 from types import TracebackType
-from typing import Any, Sequence, Mapping, Optional, Literal, Callable
+from typing import Any, Sequence, Mapping, Optional, Literal, Callable, cast
 from typing_extensions import override
 import asyncio
 
@@ -323,8 +323,9 @@ def parse_mcp_array_item(
     if _is_object_schema(item_schema):
         return ("string", None)
 
-    if (item_type, item_format) in mcp_parameter_type_map:
-        return (mcp_parameter_type_map[(item_type, item_format)], None)
+    key = (item_type, item_format)
+    if key in mcp_parameter_type_map:
+        return (mcp_parameter_type_map[cast(tuple[str, str | None], key)], None)
 
     raise FormatError(f"Unsupported array item type: {item_type}")
 
