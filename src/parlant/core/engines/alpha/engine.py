@@ -587,6 +587,9 @@ class AlphaEngine(Engine):
             matching_finished = True
 
             context.state.journeys = guideline_and_journey_matching_result.journeys
+        except asyncio.CancelledError:
+            extended_thinking_status_task.cancel()
+            raise
         finally:
             await extended_thinking_status_task
 

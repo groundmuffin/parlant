@@ -41,6 +41,7 @@ All notable changes to Parlant will be documented here.
 
 ### Fixed
 
+- Fix deadlock when sending a new message right after a preamble
 - Fix transitive filtering in relational resolver for custom tag dependency targets (guidelines depending on a custom tag are now correctly deactivated when a tagged member is deprioritized)
 - Fix SSE `read_event` endpoint stalling after first streaming chunk until full completion
 - Fix response analysis logs not always reaching the integrated UI
