@@ -563,7 +563,13 @@ class AlphaEngine(Engine):
                 return
 
             policy = self._perceived_performance_policy_provider.get_policy(context.agent.id)
-            timeout = async_utils.Timeout(await policy.get_extended_processing_indicator_delay())
+
+            extended_delay = await policy.get_extended_processing_indicator_delay()
+
+            if extended_delay is None:
+                return
+
+            timeout = async_utils.Timeout(extended_delay)
 
             while not matching_finished:
                 if await timeout.wait_up_to(0.1):

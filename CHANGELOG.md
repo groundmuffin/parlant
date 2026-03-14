@@ -29,6 +29,7 @@ All notable changes to Parlant will be documented here.
 
 ### Changed
 
+- Made extended thinking indicator optional in perceived performance policy
 - Change `reevaluate_after()` on `Tag` and `Guideline` to accept multiple tools (`*tools`) and return `Sequence[Relationship]`
 - Change `tags` field type from `Sequence[TagId]` to `Sequence[Tag]` on `Guideline`, `Journey`, `Capability`, `Term`, `Variable`, `Customer`, and `Agent` in the SDK
 - Change `Tag.preamble()` to return a full `Tag` object instead of a `TagId`
