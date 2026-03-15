@@ -7,9 +7,6 @@ All notable changes to Parlant will be documented here.
 ### Added
 
 - Add per-agent planners via `Server.create_agent(planner=...)`, allowing each agent to use a custom `Planner` implementation
-- Add `BasicPlanner` ABC with built-in tracing and logger scoping; derived classes implement `do_plan()` instead of `plan()`
-- Add `MultiStepPlanner` (formerly `BasicPlanner`), an LLM-backed planner that sequences dependent tools across engine iterations (e.g. check availability before booking), while allowing independent tools to run in parallel
-- Add `Plan.deferred_guideline_matches` to support planner-driven tool deferral: deferred guidelines are re-injected into the next iteration's resolution step, where they participate in relational resolution (priority, dependency) alongside reevaluated guidelines
 - Accept `Tag` as a target in `depend_on()`, `exclude()`, and `prioritize_over()` on both `Guideline` and `Tag`, enabling relationships that target all guidelines sharing a custom tag
 - Add `Tag.depend_on()`, `Tag.exclude()`, and `Tag.prioritize_over()` methods to the SDK, enabling tag-based dependency and priority relationships with guidelines and journeys
 - Support custom TAG as source for DEPENDENCY relationships in the relational resolver
