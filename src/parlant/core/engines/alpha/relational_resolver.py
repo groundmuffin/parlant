@@ -402,6 +402,23 @@ class RelationalResolver:
         deprioritized_guideline_ids: set[GuidelineId] = set()
         deprioritized_journey_ids: set[JourneyId] = set()
 
+        # Pre-populate deprioritized journeys from journey-to-journey priority.
+        # This is needed because scoped guidelines (created via journey.create_guideline())
+        # don't carry journey_node metadata, so they won't trigger journey deprioritization
+        # during per-match processing.
+        active_journey_ids = {j.id for j in journeys}
+        for journey in journeys:
+            journey_tag = Tag.for_journey_id(journey.id).id
+            priority_rels = await self._get_relationships(
+                cache, RelationshipKind.PRIORITY, True, target_id=journey_tag
+            )
+            for rel in priority_rels:
+                if rel.source.kind == RelationshipEntityKind.TAG:
+                    if src_journey_id := Tag.extract_journey_id(cast(TagId, rel.source.id)):
+                        if src_journey_id in active_journey_ids:
+                            deprioritized_journey_ids.add(journey.id)
+                            break
+
         result = []
 
         for match in matches:

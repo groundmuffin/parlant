@@ -2412,3 +2412,164 @@ async def test_that_tag_dependency_on_custom_tagged_journey_deactivates_when_jou
 
     result_ids = {m.guideline.id for m in result.matches}
     assert result_ids == {g_extra.id}
+
+
+async def test_that_relational_resolver_deprioritizes_journey_scoped_guideline_when_journey_is_deprioritized(
+    container: Container,
+) -> None:
+    """When two journeys both have scoped guidelines (persisted, with dependency
+    on journey tag but without journey_node metadata), and one journey has
+    priority over the other, only the prioritized journey's scoped guideline
+    should survive resolution."""
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    # Create two journeys with conditions
+    j1_condition = await guideline_store.create_guideline(condition="Customer asks about drinks")
+    j2_condition = await guideline_store.create_guideline(condition="Customer asks about drinks")
+
+    j1 = await journey_store.create_journey(
+        title="Journey 1",
+        description="",
+        conditions=[j1_condition.id],
+    )
+
+    j2 = await journey_store.create_journey(
+        title="Journey 2",
+        description="",
+        conditions=[j2_condition.id],
+    )
+
+    # Create scoped guidelines for each journey (persisted, no journey_node metadata).
+    # This mirrors what the SDK's journey.create_guideline() produces.
+    g1 = await guideline_store.create_guideline(
+        condition="always",
+        action="Recommend Pepsi",
+    )
+
+    g2 = await guideline_store.create_guideline(
+        condition="always",
+        action="Recommend Coca-Cola",
+    )
+
+    # Create DEPENDENCY from each guideline to its journey's tag
+    # (this is what journey.create_guideline() does in the SDK)
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(
+            id=g1.id,
+            kind=RelationshipEntityKind.GUIDELINE,
+        ),
+        target=RelationshipEntity(
+            id=Tag.for_journey_id(j1.id).id,
+            kind=RelationshipEntityKind.TAG,
+        ),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(
+            id=g2.id,
+            kind=RelationshipEntityKind.GUIDELINE,
+        ),
+        target=RelationshipEntity(
+            id=Tag.for_journey_id(j2.id).id,
+            kind=RelationshipEntityKind.TAG,
+        ),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    # Journey 1 has priority over Journey 2
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(
+            id=Tag.for_journey_id(j1.id).id,
+            kind=RelationshipEntityKind.TAG,
+        ),
+        target=RelationshipEntity(
+            id=Tag.for_journey_id(j2.id).id,
+            kind=RelationshipEntityKind.TAG,
+        ),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [g1, g2],
+        [
+            GuidelineMatch(guideline=g1, score=8, rationale=""),
+            GuidelineMatch(guideline=g2, score=5, rationale=""),
+        ],
+        journeys=[j1, j2],
+    )
+
+    # Only g1 (from the prioritized journey) should survive
+    assert result.matches == [GuidelineMatch(guideline=g1, score=8, rationale="")]
+
+
+async def test_that_relational_resolver_deprioritizes_journey_scoped_guideline_when_guideline_prioritizes_over_journey(
+    container: Container,
+) -> None:
+    """When a standalone guideline has priority over a journey, the journey's
+    scoped guidelines (persisted, with dependency on journey tag) should be
+    filtered out."""
+    relationship_store = container[RelationshipStore]
+    guideline_store = container[GuidelineStore]
+    journey_store = container[JourneyStore]
+    resolver = container[RelationalResolver]
+
+    j1_condition = await guideline_store.create_guideline(condition="Customer asks about drinks")
+
+    j1 = await journey_store.create_journey(
+        title="Journey 1",
+        description="",
+        conditions=[j1_condition.id],
+    )
+
+    # Journey-scoped guideline (persisted, no journey_node metadata)
+    g_scoped = await guideline_store.create_guideline(
+        condition="always",
+        action="Recommend Coca-Cola",
+    )
+
+    # Dependency from scoped guideline to the journey tag
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(
+            id=g_scoped.id,
+            kind=RelationshipEntityKind.GUIDELINE,
+        ),
+        target=RelationshipEntity(
+            id=Tag.for_journey_id(j1.id).id,
+            kind=RelationshipEntityKind.TAG,
+        ),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    # Standalone guideline that prioritizes over the journey
+    g_standalone = await guideline_store.create_guideline(
+        condition="Customer asks about drinks",
+        action="Recommend Pepsi",
+    )
+
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(
+            id=g_standalone.id,
+            kind=RelationshipEntityKind.GUIDELINE,
+        ),
+        target=RelationshipEntity(
+            id=Tag.for_journey_id(j1.id).id,
+            kind=RelationshipEntityKind.TAG,
+        ),
+        kind=RelationshipKind.PRIORITY,
+    )
+
+    result = await resolver.resolve(
+        [g_standalone, g_scoped],
+        [
+            GuidelineMatch(guideline=g_standalone, score=8, rationale=""),
+            GuidelineMatch(guideline=g_scoped, score=5, rationale=""),
+        ],
+        journeys=[j1],
+    )
+
+    # Only the standalone guideline should survive
+    assert result.matches == [GuidelineMatch(guideline=g_standalone, score=8, rationale="")]
