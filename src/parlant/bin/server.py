@@ -123,7 +123,6 @@ from parlant.core.engines.alpha.perceived_performance_policy import (
     PerceivedPerformancePolicyProvider,
 )
 from parlant.core.engines.alpha.planners import NullPlanner, PlannerProvider
-from parlant.core.engines.alpha.planning.basic_planner import MultiStepPlanner, MultiStepPlanSchema
 from parlant.core.engines.alpha.relational_resolver import RelationalResolver
 from parlant.core.engines.alpha.tool_calling.overlapping_tools_batch import (
     OverlappingToolsBatchSchema,
@@ -645,7 +644,6 @@ async def setup_container() -> AsyncIterator[Container]:
     _define_singleton(c, ToolCaller, ToolCaller)
 
     _define_singleton(c, RelationalResolver, RelationalResolver)
-    _define_singleton(c, MultiStepPlanner, MultiStepPlanner)
     c[PlannerProvider] = PlannerProvider(default_planner=NullPlanner())
 
     _define_singleton(
@@ -891,7 +889,6 @@ async def initialize_container(
         JourneyBacktrackCheckSchema,
         RelativeActionSchema,
         ReachableNodesEvaluationSchema,
-        MultiStepPlanSchema,
     ):
         generator = await nlp_service_instance.get_schematic_generator(schema)
 

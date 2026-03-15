@@ -13,66 +13,177 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from itertools import chain
+from typing import Sequence
 
 from parlant.core.agents import AgentId
 from parlant.core.engines.alpha.engine_context import EngineContext
 from parlant.core.engines.alpha.guideline_matching.guideline_match import GuidelineMatch
+from parlant.core.engines.alpha.tool_calling.tool_caller import (
+    ToolCall,
+    ToolCallInferenceResult,
+    ToolCallResult,
+)
 from parlant.core.loggers import Logger
-from parlant.core.tools import ToolId
 from parlant.core.tracer import Tracer
 
 _PLANNER_SPAN_NAME = "planner"
 
 
-@dataclass(frozen=True)
-class Plan:
-    needs_additional_iteration: bool
-    reasoning: str
-    deferred_guideline_matches: dict[GuidelineMatch, list[ToolId]] = field(default_factory=dict)
-    """Guidelines whose tools were deferred to a later iteration.
+class Plan(ABC):
+    def __init__(self) -> None:
+        self.needs_additional_iteration: bool = False
+        self.thoughts: list[str] = []
 
-    The engine will re-inject these into the next iteration's resolution step,
-    so they participate in relational resolution (priority, dependency, etc.)
-    alongside any newly reevaluated guidelines. The planner will then see them
-    again and can decide whether to run or further defer them.
-    """
+    @property
+    @abstractmethod
+    def reasoning(self) -> str: ...
+
+    @abstractmethod
+    async def on_guidelines_matched(
+        self,
+        context: EngineContext,
+        matched_guidelines: list[GuidelineMatch],
+    ) -> None:
+        """Called after guideline matching but before relational resolution."""
+        ...
+
+    @abstractmethod
+    async def on_guidelines_resolved(self, context: EngineContext) -> None:
+        """Called after relational resolution and tool-enabled/ordinary split."""
+        ...
+
+    @abstractmethod
+    async def on_tools_inferred(
+        self,
+        context: EngineContext,
+        inference_result: ToolCallInferenceResult,
+    ) -> Sequence[ToolCall]:
+        """Called after tool calls have been inferred but before they're executed."""
+        ...
+
+    @abstractmethod
+    async def on_tools_called(
+        self,
+        context: EngineContext,
+        tool_results: Sequence[ToolCallResult],
+    ) -> None:
+        """Called after tool calls have been executed."""
+        ...
 
 
 class Planner(ABC):
     @abstractmethod
-    async def plan(self, context: EngineContext) -> Plan:
-        """Inspect the current engine context and decide what should run this iteration.
+    async def create_plan(self, context: EngineContext) -> Plan: ...
 
-        The planner may mutate context.state (e.g. filtering tool_enabled_guideline_matches
-        or ordinary_guideline_matches) to control which tools and guidelines are active
-        for the current iteration. These fields are overwritten at the start of each
-        subsequent iteration, so mutations are naturally scoped.
 
-        To defer tools to a later iteration, populate Plan.deferred_guideline_matches.
-        The engine will re-inject deferred guidelines into the next iteration's
-        resolution step, where they participate in relational resolution alongside
-        any newly reevaluated guidelines.
+class NullPlan(Plan):
+    @property
+    def reasoning(self) -> str:
+        return ""
 
-        Returns a Plan indicating whether an additional iteration is needed
-        (beyond what reevaluation relationships would trigger) and optional reasoning
-        for observability.
-        """
-        ...
+    async def on_guidelines_matched(
+        self,
+        context: EngineContext,
+        matched_guidelines: list[GuidelineMatch],
+    ) -> None:
+        pass
+
+    async def on_guidelines_resolved(self, context: EngineContext) -> None:
+        pass
+
+    async def on_tools_inferred(
+        self,
+        context: EngineContext,
+        inference_result: ToolCallInferenceResult,
+    ) -> Sequence[ToolCall]:
+        return list(chain.from_iterable(inference_result.batches))
+
+    async def on_tools_called(
+        self,
+        context: EngineContext,
+        tool_results: Sequence[ToolCallResult],
+    ) -> None:
+        pass
 
 
 class NullPlanner(Planner):
-    async def plan(self, context: EngineContext) -> Plan:
-        return Plan(
-            needs_additional_iteration=False,
-            reasoning="",
-        )
+    async def create_plan(self, context: EngineContext) -> Plan:
+        return NullPlan()
+
+
+class BasicPlan(Plan):
+    """Base plan with built-in tracing and logger scoping.
+
+    Derived classes implement do_ methods instead of on_ methods.
+    """
+
+    def __init__(self, logger: Logger, tracer: Tracer) -> None:
+        super().__init__()
+        self._logger = logger
+        self._tracer = tracer
+
+    @abstractmethod
+    async def do_on_guidelines_matched(
+        self,
+        context: EngineContext,
+        matched_guidelines: list[GuidelineMatch],
+    ) -> None: ...
+
+    @abstractmethod
+    async def do_on_guidelines_resolved(self, context: EngineContext) -> None: ...
+
+    @abstractmethod
+    async def do_on_tools_inferred(
+        self,
+        context: EngineContext,
+        inference_result: ToolCallInferenceResult,
+    ) -> Sequence[ToolCall]: ...
+
+    @abstractmethod
+    async def do_on_tools_called(
+        self,
+        context: EngineContext,
+        tool_results: Sequence[ToolCallResult],
+    ) -> None: ...
+
+    async def on_guidelines_matched(
+        self,
+        context: EngineContext,
+        matched_guidelines: list[GuidelineMatch],
+    ) -> None:
+        with self._logger.scope(type(self).__name__):
+            with self._tracer.span(_PLANNER_SPAN_NAME):
+                await self.do_on_guidelines_matched(context, matched_guidelines)
+
+    async def on_guidelines_resolved(self, context: EngineContext) -> None:
+        with self._logger.scope(type(self).__name__):
+            with self._tracer.span(_PLANNER_SPAN_NAME):
+                await self.do_on_guidelines_resolved(context)
+
+    async def on_tools_inferred(
+        self,
+        context: EngineContext,
+        inference_result: ToolCallInferenceResult,
+    ) -> Sequence[ToolCall]:
+        with self._logger.scope(type(self).__name__):
+            with self._tracer.span(_PLANNER_SPAN_NAME):
+                return await self.do_on_tools_inferred(context, inference_result)
+
+    async def on_tools_called(
+        self,
+        context: EngineContext,
+        tool_results: Sequence[ToolCallResult],
+    ) -> None:
+        with self._logger.scope(type(self).__name__):
+            with self._tracer.span(_PLANNER_SPAN_NAME):
+                await self.do_on_tools_called(context, tool_results)
 
 
 class BasicPlanner(Planner):
     """Base planner with built-in tracing and logger scoping.
 
-    Derived classes implement do_plan() instead of plan().
+    Derived classes implement do_create_plan() instead of create_plan().
     """
 
     def __init__(self, logger: Logger, tracer: Tracer) -> None:
@@ -80,12 +191,12 @@ class BasicPlanner(Planner):
         self._tracer = tracer
 
     @abstractmethod
-    async def do_plan(self, context: EngineContext) -> Plan: ...
+    async def do_create_plan(self, context: EngineContext) -> Plan: ...
 
-    async def plan(self, context: EngineContext) -> Plan:
+    async def create_plan(self, context: EngineContext) -> Plan:
         with self._logger.scope(type(self).__name__):
             with self._tracer.span(_PLANNER_SPAN_NAME):
-                return await self.do_plan(context)
+                return await self.do_create_plan(context)
 
 
 class PlannerProvider:

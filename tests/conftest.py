@@ -108,7 +108,6 @@ from parlant.core.engines.alpha.guideline_matching.generic.response_analysis_bat
 from parlant.core.engines.alpha import message_generator
 from parlant.core.engines.alpha.hooks import EngineHooks
 from parlant.core.engines.alpha.planners import NullPlanner, PlannerProvider
-from parlant.core.engines.alpha.planning.basic_planner import MultiStepPlanner, MultiStepPlanSchema
 from parlant.core.engines.alpha.relational_resolver import RelationalResolver
 from parlant.core.engines.alpha.tool_calling.default_tool_call_batcher import DefaultToolCallBatcher
 from parlant.core.engines.alpha.canned_response_generator import (
@@ -507,7 +506,6 @@ async def container(
             RelativeActionSchema,
             ReachableNodesEvaluationSchema,
             JourneyBacktrackCheckSchema,
-            MultiStepPlanSchema,
         ):
             container[SchematicGenerator[generation_schema]] = await make_schematic_generator(  # type: ignore
                 container,
@@ -578,7 +576,6 @@ async def container(
         container[ToolCallBatcher] = lambda container: container[DefaultToolCallBatcher]
         container[ToolCaller] = Singleton(ToolCaller)
         container[RelationalResolver] = Singleton(RelationalResolver)
-        container[MultiStepPlanner] = Singleton(MultiStepPlanner)
         container[PlannerProvider] = PlannerProvider(default_planner=NullPlanner())
         container[CannedResponseGenerator] = Singleton(CannedResponseGenerator)
         container[NoMatchResponseProvider] = Singleton(BasicNoMatchResponseProvider)

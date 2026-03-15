@@ -259,14 +259,11 @@ from parlant.core.engines.alpha.perceived_performance_policy import (
 )
 from parlant.core.engines.alpha.planners import (
     BasicPlanner,
+    NullPlan,
+    NullPlanner,
     Plan,
     Planner,
-    NullPlanner,
     PlannerProvider,
-)
-from parlant.core.engines.alpha.planning.basic_planner import (
-    MultiStepPlanner,
-    MultiStepPlanSchema,
 )
 from parlant.bin.server import PARLANT_HOME_DIR, start_parlant, StartupParameters
 from parlant.core.services.tools.plugins import PluginServer, ToolEntry, tool
@@ -944,6 +941,15 @@ class Relationship:
 
 
 @dataclass(frozen=True)
+class ToolCall:
+    """Represents a tool call by the agent."""
+
+    tool_id: ToolId
+    arguments: Mapping[str, JSONSerializable]
+    result: ToolResult
+
+
+@dataclass(frozen=True)
 class GuidelineMatch:
     """Result of a custom guideline matcher."""
 
@@ -970,6 +976,33 @@ class GuidelineMatchingContext:
     customer: Customer
     variables: Mapping[Variable, JSONSerializable]
     staged_events: Sequence[EmittedEvent]
+
+    @property
+    def staged_tool_calls(self) -> Sequence[ToolCall]:
+        """Returns the staged events that are tool calls."""
+        core_tool_calls = chain.from_iterable(
+            [
+                cast(ToolEventData, e.data)["tool_calls"]
+                for e in self.staged_events
+                if e.kind == EventKind.TOOL
+            ]
+        )
+
+        return [
+            ToolCall(
+                tool_id=ToolId.from_string(call["tool_id"]),
+                arguments=call["arguments"],
+                result=ToolResult(
+                    data=call["result"].get("data"),
+                    metadata=call["result"].get("metadata"),
+                    control=call["result"].get("control"),
+                    canned_responses=call["result"].get("canned_responses"),
+                    canned_response_fields=call["result"].get("canned_response_fields"),
+                    guidelines=call["result"].get("guidelines"),
+                ),
+            )
+            for call in core_tool_calls
+        ]
 
     @classmethod
     async def _from_core(
@@ -5452,13 +5485,12 @@ __all__ = [
     "ModerationCheck",
     "ModerationService",
     "ModerationTag",
-    "MultiStepPlanner",
-    "MultiStepPlanSchema",
     "NLPService",
     "NLPServices",
     "NoMatchResponseProvider",
     "NoModeration",
     "NullPerceivedPerformancePolicy",
+    "NullPlan",
     "NullPlanner",
     "Operation",
     "OutputMode",

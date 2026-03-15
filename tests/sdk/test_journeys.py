@@ -492,7 +492,7 @@ class Test_that_journey_can_take_priority_over_another_journey(SDKTest):
         self.high_priority = await self.agent.create_journey(
             title="Journey 1",
             conditions=["Customer asks about drinks"],
-            description="Recommend Pepsi to the customer",
+            description="",
         )
 
         await self.high_priority.create_guideline(
@@ -503,7 +503,7 @@ class Test_that_journey_can_take_priority_over_another_journey(SDKTest):
         self.low_priority = await self.agent.create_journey(
             title="Journey 2",
             conditions=["Customer asks about drinks"],
-            description="Recommend Coca-Cola to the customer",
+            description="",
         )
 
         await self.low_priority.create_guideline(
@@ -921,7 +921,7 @@ class Test_that_a_journey_is_reevaluated_after_a_skipped_tool_call(SDKTest):
 class Test_that_a_missing_data_is_shown_after_journey_is_reevaluated(SDKTest):
     async def setup(self, server: p.Server) -> None:
         @tool
-        def get_customer_last_time_drank(context: ToolContext, customer_name: str) -> ToolResult:
+        def get_customer_last_time_drank(context: ToolContext, customer_age: int) -> ToolResult:
             return ToolResult(data={"last_time_drank": "January 1, 2000"})
 
         self.agent = await server.create_agent(
@@ -950,7 +950,7 @@ class Test_that_a_missing_data_is_shown_after_journey_is_reevaluated(SDKTest):
             "I'm really thirsty", recipient=self.agent, reuse_session=True
         )
 
-        assert await nlp_test(first_response, "It asks for the customer's name")
+        assert await nlp_test(first_response, "It asks for the customer's age")
 
 
 class Test_that_metadata_can_be_set_to_a_journey_state(SDKTest):
