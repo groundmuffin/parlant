@@ -317,8 +317,8 @@ def parse_mcp_array_item(
         enum_desc = parse_enum_def(def_)
         return (enum_desc["type"], enum_desc["enum"])
 
-    item_type = item_schema.get("type")
-    item_format = item_schema.get("format")
+    item_type = cast(str, item_schema.get("type"))
+    item_format = cast(str, item_schema.get("format"))
 
     if _is_object_schema(item_schema):
         return ("string", None)
