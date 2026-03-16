@@ -4747,7 +4747,7 @@ class Server:
 
                 return EngineHookResult.CALL_NEXT
 
-            c[EngineHooks].on_acknowledged.append(on_message_acknowledged)
+            c[EngineHooks].on_preparing.append(on_message_acknowledged)
             c[EngineHooks].on_generating_messages.append(on_generating_messages)
 
         for agent in self._retrievers:

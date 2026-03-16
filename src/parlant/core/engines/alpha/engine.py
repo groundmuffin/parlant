@@ -277,10 +277,10 @@ class AlphaEngine(Engine):
             return  # Hook requested to bail out
 
         try:
+            await self._initialize_response_state(context)
+
             if not await self._hooks.call_on_preparing(context):
                 return  # Hook requested to bail out
-
-            await self._initialize_response_state(context)
 
             plan = await self._planner_provider.get_planner(
                 context.agent.id,

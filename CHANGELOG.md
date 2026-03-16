@@ -4,7 +4,9 @@ All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
 
-TBD
+### Fixed
+
+- Fix `Variable.get_value()` returning `None` when called from a retriever, caused by retrievers starting before context variables were loaded
 
 ## [3.3.0] - 2025-03-15
 
