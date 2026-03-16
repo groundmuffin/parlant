@@ -463,3 +463,61 @@ class Test_that_guideline_depend_on_tag_deactivates_guideline_when_tagged_depend
         assert "pepsi" not in response.lower(), (
             f"Expected 'pepsi' NOT in response (tag dependency not met) but got: {response}"
         )
+
+
+class Test_that_staged_tool_calls_are_accessible_in_custom_matcher_context(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Staged Tool Calls Agent",
+            description="Agent for testing staged_tool_calls in custom matcher",
+        )
+
+        @p.tool
+        async def check_account(context: ToolContext, account_id: str) -> ToolResult:
+            return ToolResult(data={"account_id": account_id, "verified": True})
+
+        await self.agent.create_observation(
+            condition="the customer asks to verify their account",
+            tools=[check_account],
+        )
+
+        self.saw_tool_call = False
+
+        async def matcher_that_checks_staged_tool_calls(
+            ctx: p.GuidelineMatchingContext, guideline: p.Guideline
+        ) -> p.GuidelineMatch:
+            for call in ctx.staged_tool_calls:
+                if call.tool_id.tool_name == "check_account":
+                    self.saw_tool_call = True
+                    return p.GuidelineMatch(
+                        id=guideline.id,
+                        matched=True,
+                        rationale="Found check_account in staged tool calls",
+                    )
+
+            return p.GuidelineMatch(
+                id=guideline.id,
+                matched=False,
+                rationale="check_account not found in staged tool calls",
+            )
+
+        pepsi_offer = await self.agent.create_guideline(
+            action="Offer the customer a Pepsi immediately",
+            matcher=matcher_that_checks_staged_tool_calls,
+        )
+
+        await pepsi_offer.reevaluate_after(check_account)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Please verify my account, ID is 12345",
+            recipient=self.agent,
+        )
+
+        assert self.saw_tool_call, (
+            "Expected custom matcher to see check_account in staged_tool_calls"
+        )
+        assert "pepsi" in response.lower(), (
+            f"Expected 'pepsi' in response (matcher should match via staged_tool_calls) "
+            f"but got: {response}"
+        )
