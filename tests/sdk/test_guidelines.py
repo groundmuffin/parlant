@@ -1109,3 +1109,173 @@ class Test_that_untracked_guideline_is_reapplied_in_same_session(SDKTest):
         assert "pepsi" in second_response.lower(), (
             f"Second response should still offer Pepsi, got: {second_response}"
         )
+
+
+class Test_that_a_guideline_with_custom_tag_is_followed(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tag Test Agent",
+            description="Agent for testing custom tags",
+        )
+
+        tag = await server.create_tag("vip")
+
+        await self.agent.create_guideline(
+            condition="always, in all circumstances",
+            action="Offer a Pepsi",
+            tags=[tag],
+        )
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello there",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" in response.lower(), f"Expected 'pepsi' in response but got: {response}"
+
+
+class Test_that_tag_prioritize_over_deprioritizes_target_guideline(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tag Priority Agent",
+            description="Agent for testing tag-based prioritization",
+        )
+
+        tag = await server.create_tag("priority-group")
+
+        await self.agent.create_guideline(
+            condition="always, in all circumstances",
+            action="Offer a Pepsi",
+            tags=[tag],
+        )
+
+        g2 = await self.agent.create_guideline(
+            condition="always, in all circumstances",
+            action="Offer orange juice",
+        )
+
+        await tag.prioritize_over(g2)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" in response.lower(), f"Expected 'pepsi' in response but got: {response}"
+        assert "orange" not in response.lower(), (
+            f"Expected 'orange' to be filtered out by tag prioritization but got: {response}"
+        )
+
+
+class Test_that_tag_depend_on_deactivates_tagged_guideline_when_dependency_not_met(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tag Dependency Agent",
+            description="Agent for testing tag-based dependency",
+        )
+
+        tag = await server.create_tag("dep-group")
+
+        await self.agent.create_guideline(
+            condition="always, in all circumstances",
+            action="Offer a Pepsi",
+            tags=[tag],
+        )
+
+        g2 = await self.agent.create_guideline(
+            condition="the customer has explicitly said the word 'banana'",
+            action="Offer Coke",
+        )
+
+        await tag.depend_on(g2)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello, how are you",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" not in response.lower(), (
+            f"Expected 'pepsi' NOT in response (dependency not met) but got: {response}"
+        )
+
+
+class Test_that_guideline_depend_on_tag_deactivates_guideline_when_tagged_dependency_not_met(
+    SDKTest
+):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Guideline Tag Dependency Agent",
+            description="Agent for testing guideline dependency on a custom tag",
+        )
+
+        t1 = await server.create_tag("drink-group")
+
+        g1 = await self.agent.create_guideline(
+            matcher=p.MATCH_ALWAYS,
+            action="Offer a Pepsi",
+        )
+
+        await self.agent.create_guideline(
+            condition="the customer has explicitly said the word 'banana'",
+            action="Offer Coke",
+            tags=[t1],
+        )
+
+        # g1 depends on tag t1 — if no tagged guideline is active, g1 is deactivated
+        await g1.depend_on(t1)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" not in response.lower(), (
+            f"Expected 'pepsi' NOT in response (tag dependency not met) but got: {response}"
+        )
+
+
+class Test_that_guideline_depend_on_tag_activates_when_at_least_one_tagged_member_is_matched(
+    SDKTest
+):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Tag ANY Dependency Agent",
+            description="Agent for testing ANY semantics on tag dependency",
+        )
+
+        t1 = await server.create_tag("drink-group")
+
+        g1 = await self.agent.create_guideline(
+            matcher=p.MATCH_ALWAYS,
+            action="Offer a Pepsi",
+        )
+
+        # Two guidelines tagged with t1; only one will match
+        await self.agent.create_guideline(
+            matcher=p.MATCH_ALWAYS,
+            action="Offer Coke",
+            tags=[t1],
+        )
+
+        await self.agent.create_guideline(
+            condition="the customer has explicitly said the word 'banana'",
+            action="Offer Sprite",
+            tags=[t1],
+        )
+
+        # g1 depends on tag t1 — ANY tagged member matched should activate g1
+        await g1.depend_on(t1)
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello",
+            recipient=self.agent,
+        )
+
+        assert "pepsi" in response.lower(), (
+            f"Expected 'pepsi' in response (at least one t1 member matched) but got: {response}"
+        )

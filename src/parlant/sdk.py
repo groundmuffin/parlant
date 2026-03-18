@@ -3508,12 +3508,17 @@ class Agent:
             _container=self._container,
         )
 
-    async def get_variable(self, id: ContextVariableId | str) -> Variable:
-        """Retrieves a variable by its ID, raising an error if not found."""
+    async def get_variable(
+        self,
+        *,
+        id: ContextVariableId | str | None = None,
+        name: str | None = None,
+    ) -> Variable:
+        """Retrieves a variable by its ID or name, raising an error if not found."""
 
-        if variable := await self.find_variable(id=id):
+        if variable := await self.find_variable(id=id, name=name):
             return variable
-        raise SDKError(f"Variable with id {id} not found.")
+        raise SDKError(f"Variable with id {id} or name {name} not  found.")
 
     async def attach_retriever(
         self,

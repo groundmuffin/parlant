@@ -4,6 +4,10 @@ All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Change tag dependency semantics from ALL to ANY: a dependency on a tag is now satisfied when at least one tagged member (guideline, observation, or journey) is active, rather than requiring all of them
+
 ### Fixed
 
 - Fix `Variable.get_value()` returning `None` when called from a retriever, caused by retrievers starting before context variables were loaded

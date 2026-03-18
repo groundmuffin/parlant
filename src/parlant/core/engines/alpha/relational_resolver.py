@@ -350,17 +350,21 @@ class RelationalResolver:
                         matched_tag_guidelines.get(cast(TagId, dependency.target.id), set())
                     )
 
-                    for gid in all_guideline_ids_for_tag:
-                        if gid not in matched_guideline_ids:
-                            dependent_on_inactive_guidelines = True
-                            break
+                    # ANY semantics: at least one tagged member must be matched
+                    any_member_matched = any(
+                        gid in matched_guideline_ids for gid in all_guideline_ids_for_tag
+                    )
 
-                        if gid not in iterated_guidelines:
-                            dependencies.extend(
-                                await self._get_relationships(
-                                    cache, RelationshipKind.DEPENDENCY, True, source_id=gid
+                    if not any_member_matched:
+                        dependent_on_inactive_guidelines = True
+                    else:
+                        for gid in all_guideline_ids_for_tag:
+                            if gid in matched_guideline_ids and gid not in iterated_guidelines:
+                                dependencies.extend(
+                                    await self._get_relationships(
+                                        cache, RelationshipKind.DEPENDENCY, True, source_id=gid
+                                    )
                                 )
-                            )
 
                     iterated_guidelines.update(all_guideline_ids_for_tag)
 
@@ -618,7 +622,10 @@ class RelationalResolver:
                         tagged_guidelines = await self._guideline_store.list_guidelines(
                             tags=[cast(TagId, dependency.target.id)]
                         )
-                        if any(g.id in deprioritized_guideline_ids for g in tagged_guidelines):
+                        # ANY semantics: only deprioritized if ALL tagged members are deprioritized
+                        if tagged_guidelines and all(
+                            g.id in deprioritized_guideline_ids for g in tagged_guidelines
+                        ):
                             depends_on_deprioritized = True
                             break
 
