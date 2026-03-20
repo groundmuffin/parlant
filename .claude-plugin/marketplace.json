@@ -1,0 +1,11 @@
+{
+  "name": "parlant-plugins",
+  "owner": { "name": "Parlant" },
+  "plugins": [
+    {
+      "name": "parlant-expert",
+      "source": "./parlant-expert",
+      "description": "Makes Claude an expert on the Parlant AI agent framework"
+    }
+  ]
+}
