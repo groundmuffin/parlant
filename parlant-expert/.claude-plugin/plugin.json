@@ -2,5 +2,6 @@
   "name": "parlant-expert",
   "version": "1.0.0",
   "description": "Makes Claude an expert on the Parlant AI agent framework — guidelines, journeys, tools, SDK usage, architecture, and production deployment.",
-  "homepage": "https://parlant.io"
+  "homepage": "https://parlant.io",
+  "skills": "./skills/"
 }
