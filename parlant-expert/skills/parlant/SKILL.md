@@ -1,6 +1,6 @@
 ---
 name: parlant
-description: "Expert on the Parlant AI agent framework. Triggers when users ask about Parlant concepts (guidelines, journeys, tools, variables, glossary, canned responses, retrievers), SDK usage, architecture, production deployment, adapters, or behavior modeling."
+description: "Expert on the Parlant AI agent framework. Triggers when users ask about Parlant concepts (guidelines, journeys, tools, variables, glossary, canned responses, retrievers), Python SDK, TypeScript SDK (parlant-client), REST API endpoints, architecture, production deployment, adapters, or behavior modeling."
 allowed-tools: Read, Glob, Grep, Agent
 ---
 
@@ -315,6 +315,391 @@ LogLevel.DEBUG | .INFO | .WARNING | .ERROR | .CRITICAL
 EventKind  # message, status, tool, custom
 EventSource  # customer, ai_agent, human_agent, system
 ```
+
+---
+
+## REST API Reference
+
+The Parlant server exposes a REST API (FastAPI) at the configured host/port. Full API reference: https://www.parlant.io/docs/api/parlant-api/
+
+### Health Check
+
+```
+GET /healthz → { "status": "ok" }
+```
+
+### Agents
+
+```
+POST   /agents                  → 201 AgentDTO
+GET    /agents                  → 200 AgentDTO[]
+GET    /agents/:agent_id        → 200 AgentDTO | 404
+PATCH  /agents/:agent_id        → 200 AgentDTO | 404
+DELETE /agents/:agent_id        → 204 | 404
+```
+
+**Create body**: `{ name, id?, description?, max_engine_iterations?, composition_mode?, message_output_mode?, tags? }`
+**AgentDTO**: `{ id, name, description, creation_utc, max_engine_iterations, composition_mode, message_output_mode, tags }`
+
+### Customers
+
+```
+POST   /customers               → 201 CustomerDTO
+GET    /customers               → 200 CustomerDTO[]
+GET    /customers/:customer_id  → 200 CustomerDTO | 404
+PATCH  /customers/:customer_id  → 200 CustomerDTO | 404
+DELETE /customers/:customer_id  → 204 | 404
+```
+
+**Create body**: `{ name, metadata?, tags? }`
+
+### Sessions
+
+```
+POST   /sessions                → 201 SessionDTO
+GET    /sessions                → 200 SessionDTO[] | SessionListingDTO
+GET    /sessions/:session_id    → 200 SessionDTO | 404
+PATCH  /sessions/:session_id    → 200 SessionDTO | 404
+DELETE /sessions/:session_id    → 204 | 404
+DELETE /sessions                → 204 (bulk delete)
+```
+
+**Create body**: `{ agent_id, customer_id?, title?, metadata?, labels? }`
+**Query param** (create): `allow_greeting?: boolean`
+**List query params**: `agent_id?, customer_id?, labels?, limit?, cursor?, sort? ("asc"|"desc")`
+**SessionDTO**: `{ id, agent_id, customer_id, creation_utc, title, mode ("auto"|"manual"), consumption_offsets, metadata, labels }`
+
+### Events (nested under sessions)
+
+```
+POST   /sessions/:session_id/events              → 201 EventDTO
+GET    /sessions/:session_id/events              → 200 EventDTO[] | SSE stream
+GET    /sessions/:session_id/events/:event_id    → 200 EventDTO
+PATCH  /sessions/:session_id/events/:event_id    → 200 EventDTO
+DELETE /sessions/:session_id/events              → 204 (by offset threshold)
+```
+
+**Create body**:
+```json
+{
+  "kind": "message" | "tool" | "status" | "custom",
+  "source": "customer" | "customer_ui" | "human_agent" | "human_agent_on_behalf_of_ai_agent" | "ai_agent" | "system",
+  "message": "Hello...",           // Required for message events from customer/human_agent
+  "data": {},                      // Required for custom events
+  "metadata": {},                  // Optional key-value pairs
+  "participant": { "id": "...", "display_name": "..." },  // For human_agent sources
+  "status": "acknowledged" | "cancelled" | "processing" | "ready" | "typing" | "error",  // For status events
+  "guidelines": [{ "action": "...", "rationale": "unspecified" | "buy_time" | "follow_up" }]  // For AI agent
+}
+```
+**Query param** (create): `moderation?: "auto" | "paranoid" | "none"`
+
+**EventDTO**:
+```json
+{
+  "id": "evt_...",
+  "source": "customer",
+  "kind": "message",
+  "offset": 0,
+  "creation_utc": "2024-03-24T12:00:00Z",
+  "trace_id": "corr_...",
+  "correlation_id": "corr_...",
+  "data": {
+    "message": "The actual message text",
+    "participant": { "id": "...", "display_name": "..." }
+  },
+  "metadata": {},
+  "deleted": false
+}
+```
+
+**Key**: The message text is in `data.message`, NOT at the top level.
+
+**List events query params** (long-polling):
+- `min_offset` — only events with offset >= this value
+- `source` — filter by event source
+- `trace_id` — filter by trace ID
+- `kinds` — comma-separated string: `"message,status"`, `"message,tool"`
+- `wait_for_data` — long-poll timeout in seconds (default 60; 0 = immediate return; >0 = wait for new events, 504 on timeout)
+- `sse` — if `true`, returns `text/event-stream` (Server-Sent Events) instead of JSON array
+
+### Terms (Glossary)
+
+```
+POST   /terms/:agent_id              → 201 TermDTO
+GET    /terms/:agent_id              → 200 TermDTO[]
+GET    /terms/:agent_id/:term_id     → 200 TermDTO | 404
+PATCH  /terms/:agent_id/:term_id     → 200 TermDTO | 404
+DELETE /terms/:agent_id/:term_id     → 204 | 404
+```
+
+**Create body**: `{ name, description, synonyms?, tags?, id? }`
+
+### Guidelines
+
+```
+POST   /guidelines                   → 201 GuidelineDTO
+GET    /guidelines                   → 200 GuidelineDTO[]
+GET    /guidelines/:guideline_id     → 200 GuidelineDTO | 404
+PATCH  /guidelines/:guideline_id     → 200 GuidelineDTO | 404
+DELETE /guidelines/:guideline_id     → 204 | 404
+```
+
+### Canned Responses
+
+```
+POST   /canned_responses                          → 201 CannedResponseDTO
+GET    /canned_responses                          → 200 CannedResponseDTO[]
+GET    /canned_responses/:canned_response_id      → 200 CannedResponseDTO | 404
+PATCH  /canned_responses/:canned_response_id      → 200 CannedResponseDTO | 404
+DELETE /canned_responses/:canned_response_id      → 204 | 404
+```
+
+**Create body**: `{ value, fields?, tags?, signals?, metadata?, field_dependencies? }`
+
+### Context Variables
+
+```
+POST   /context-variables                          → 201
+GET    /context-variables                          → 200
+GET    /context-variables/:variable_id             → 200 | 404
+PATCH  /context-variables/:variable_id             → 200 | 404
+DELETE /context-variables/:variable_id             → 204 | 404
+GET    /context-variables/:variable_id/:key        → 200 (read value for customer/tag)
+PUT    /context-variables/:variable_id/:key        → 200 (set value for customer/tag)
+```
+
+### Tags
+
+```
+POST   /tags              → 201
+GET    /tags              → 200
+GET    /tags/:tag_id      → 200 | 404
+PATCH  /tags/:tag_id      → 200 | 404
+DELETE /tags/:tag_id      → 204 | 404
+```
+
+### Services (Tool Services)
+
+```
+GET    /services          → 200 (list, no tool details)
+GET    /services/:name    → 200 | 404 | 503 (full details with tools)
+PUT    /services/:name    → 200 (create or update; name must be kebab-case)
+DELETE /services/:name    → 204 | 404
+```
+
+### Journeys
+
+```
+POST   /journeys                         → 201
+GET    /journeys                         → 200
+GET    /journeys/:journey_id             → 200 | 404
+PATCH  /journeys/:journey_id             → 200 | 404
+DELETE /journeys/:journey_id             → 204 | 404
+GET    /journeys/:journey_id/mermaid     → 200 text/plain (Mermaid stateDiagram)
+```
+
+### Other Endpoints
+
+```
+POST/GET/PATCH/DELETE  /relationships     — Guideline/tag relationships
+POST/GET/PATCH/DELETE  /capabilities      — Capabilities (title, description, signals)
+POST/GET               /evaluations       — Evaluation tasks
+GET                    /logs              — WebSocket-based log streaming
+```
+
+### Server Lifecycle
+
+The `async with Server()` pattern is a **setup-only block** — the HTTP server does NOT start inside the `async with` body. It starts in `__aexit__`:
+
+```python
+async with Server(
+    host="0.0.0.0",
+    port=8800,
+    nlp_service=NLPServices.openai,
+) as server:
+    # Setup code runs here (create agents, guidelines, etc.)
+    agent = await server.create_agent(name="My Agent")
+    # ...
+# HTTP server starts HERE (after exiting the block)
+# Server runs until the process is terminated
+```
+
+The `server.ready` event is set when the health check (`/healthz`) succeeds. If you need to interact with the API programmatically after it starts, use `await server.ready.wait()` inside an `__aexit__`-triggered callback or a separate async task.
+
+---
+
+## TypeScript SDK (`parlant-client`)
+
+The TypeScript SDK is an auto-generated REST client (via Fern) published on npm.
+
+### Installation
+
+```bash
+npm install parlant-client
+```
+
+### Client Initialization
+
+```typescript
+import { ParlantClient } from 'parlant-client';
+
+const client = new ParlantClient({
+  environment: "http://localhost:8800"
+});
+```
+
+### Key Methods
+
+#### Sessions
+
+```typescript
+// Create a session
+const session = await client.sessions.create({
+  agentId: "ag_123",
+  customerId: "cust_456",  // optional — guest if omitted
+  title: "Support Chat",
+  // metadata, labels also supported
+});
+
+// List sessions
+const sessions = await client.sessions.list({
+  agentId: "ag_123",
+  labels: ["vip"],
+});
+
+// Read a session
+const session = await client.sessions.read("session_id");
+```
+
+#### Events
+
+```typescript
+// Send a customer message
+await client.sessions.createEvent("session_id", {
+  kind: "message",
+  source: "customer",
+  message: "Hello, I need help"
+});
+
+// Long-poll for new events
+const events = await client.sessions.listEvents("session_id", {
+  minOffset: lastOffset,     // Only events after this offset
+  waitForData: 30,           // Wait up to 30 seconds
+  kinds: ["message", "status"]  // Filter by event kind
+});
+
+// Access message text from an event
+const text = event.data.message;            // The message content
+const sender = event.data.participant?.display_name;  // Sender name
+const status = event.data.status;           // For status events
+```
+
+#### Agents
+
+```typescript
+// Create an agent
+const agent = await client.agents.create({
+  name: "Support Agent",
+  description: "Handles customer inquiries"
+});
+
+// List agents
+const agents = await client.agents.list();
+```
+
+### Complete Chat Integration Pattern
+
+```typescript
+import { ParlantClient } from 'parlant-client';
+
+class ParlantChat {
+  private client: ParlantClient;
+  private sessionId: string | null = null;
+  private lastOffset: number = 0;
+
+  constructor(serverUrl: string) {
+    this.client = new ParlantClient({ environment: serverUrl });
+  }
+
+  async createSession(agentId: string, customerId?: string): Promise<string> {
+    const session = await this.client.sessions.create({
+      agentId, customerId,
+      title: `Chat ${new Date().toLocaleString()}`
+    });
+    this.sessionId = session.id;
+    this.startEventMonitoring();
+    return this.sessionId;
+  }
+
+  async sendMessage(message: string): Promise<void> {
+    if (!this.sessionId) throw new Error('No active session');
+    await this.client.sessions.createEvent(this.sessionId, {
+      kind: "message",
+      source: "customer",
+      message
+    });
+  }
+
+  private async startEventMonitoring(): Promise<void> {
+    if (!this.sessionId) return;
+    while (true) {
+      try {
+        const events = await this.client.sessions.listEvents(this.sessionId, {
+          minOffset: this.lastOffset,
+          waitForData: 30,
+          kinds: ["message", "status"]
+        });
+        for (const event of events) {
+          if (event.kind === "message") {
+            console.log(`[${event.source}] ${event.data.message}`);
+          } else if (event.kind === "status") {
+            console.log(`Status: ${event.data.status}`);
+          }
+          this.lastOffset = Math.max(this.lastOffset, event.offset + 1);
+        }
+      } catch (error) {
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    }
+  }
+}
+```
+
+### React Widget (`parlant-chat-react`)
+
+For quick React integration, use the official widget:
+
+```bash
+npm install parlant-chat-react
+```
+
+```jsx
+import ParlantChatbox from 'parlant-chat-react';
+
+<ParlantChatbox
+  server="http://localhost:8800"
+  agentId="your-agent-id"
+  customerId="customer-123"     // optional
+  sessionId="existing-session"  // optional, to resume
+  float={true}                  // floating popup mode
+/>
+```
+
+### SDK Field Name Mapping (REST vs TypeScript SDK)
+
+The TypeScript SDK uses **camelCase** while the REST API uses **snake_case**:
+
+| REST API field     | TypeScript SDK field |
+|--------------------|---------------------|
+| `agent_id`         | `agentId`           |
+| `customer_id`      | `customerId`        |
+| `session_id`       | `sessionId`         |
+| `min_offset`       | `minOffset`         |
+| `wait_for_data`    | `waitForData`       |
+| `trace_id`         | `traceId`           |
+| `display_name`     | `displayName`       |
+| `creation_utc`     | `creationUtc`       |
 
 ---
 
